@@ -103,20 +103,21 @@ class FaviconStore
     public function response(Favicon $favicon, ?int $size = null): Response
     {
         $etag = '"'.hash('sha256', $favicon->domain.'|'.$favicon->fetched_at?->timestamp.'|'.($size ?? 'master')).'"';
+        $headers = $this->cacheHeaders($favicon, $etag);
 
         if (request()->headers->get('If-None-Match') === $etag) {
-            return response('', 304, $this->cacheHeaders($etag));
+            return response('', 304, $headers);
         }
 
         if ($favicon->content_type === 'image/svg+xml') {
-            return response($this->contents($favicon), 200, array_merge($this->cacheHeaders($etag), [
+            return response($this->contents($favicon), 200, array_merge($headers, [
                 'Content-Type' => 'image/svg+xml',
             ]));
         }
 
         if ($size !== null) {
             if ($this->shouldGenerateLetterFallback($favicon)) {
-                return response($this->fallbackIconGenerator->generate($favicon->domain, $size), 200, array_merge($this->cacheHeaders($etag), [
+                return response($this->fallbackIconGenerator->generate($favicon->domain, $size), 200, array_merge($headers, [
                     'Content-Type' => 'image/png',
                 ]));
             }
@@ -124,7 +125,7 @@ class FaviconStore
             $resized = $this->resize($favicon, $size);
 
             if ($resized !== null) {
-                return response($resized, 200, array_merge($this->cacheHeaders($etag), [
+                return response($resized, 200, array_merge($headers, [
                     'Content-Type' => 'image/png',
                 ]));
             }
@@ -137,13 +138,13 @@ class FaviconStore
         if (! is_file($path)) {
             $contents = $this->fallbackIconGenerator->generate($favicon->domain);
 
-            return response($contents, 200, array_merge($this->cacheHeaders($etag), [
+            return response($contents, 200, array_merge($headers, [
                 'Content-Type' => 'image/png',
             ]));
         }
 
         /** @var BinaryFileResponse $response */
-        $response = response()->file($path, array_merge($this->cacheHeaders($etag), [
+        $response = response()->file($path, array_merge($headers, [
             'Content-Type' => $favicon->content_type,
         ]));
 
@@ -199,15 +200,20 @@ class FaviconStore
     /**
      * @return array<string, string>
      */
-    private function cacheHeaders(string $etag): array
+    private function cacheHeaders(Favicon $favicon, string $etag): array
     {
-        $maxAge = (int) config('favicons.cache_max_age');
         $stale = (int) config('favicons.stale_while_revalidate');
 
-        return [
-            'Cache-Control' => "public, max-age={$maxAge}, stale-while-revalidate={$stale}",
+        $headers = [
+            'Cache-Control' => "public, max-age=0, must-revalidate, stale-while-revalidate={$stale}",
             'ETag' => $etag,
         ];
+
+        if ($favicon->fetched_at !== null) {
+            $headers['Last-Modified'] = $favicon->fetched_at->toRfc7231String();
+        }
+
+        return $headers;
     }
 
     private function extensionFor(string $contentType): string

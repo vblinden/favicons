@@ -65,9 +65,12 @@ return [
     |--------------------------------------------------------------------------
     | HTTP Caching
     |--------------------------------------------------------------------------
+    |
+    | Responses always revalidate (max-age=0, must-revalidate) so DELETE
+    | refresh is visible on the next request. stale_while_revalidate allows
+    | soft-serving while a revalidation is in flight.
+    |
     */
-
-    'cache_max_age' => (int) env('FAVICONS_CACHE_MAX_AGE', 604800),
 
     'stale_while_revalidate' => (int) env('FAVICONS_STALE_WHILE_REVALIDATE', 86400),
 

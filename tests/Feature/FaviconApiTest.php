@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Favicon;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -233,6 +234,59 @@ test('it refreshes a favicon and rate limits after five attempts per week', func
     $this->delete('/r/example.com')
         ->assertTooManyRequests()
         ->assertHeader('Retry-After');
+});
+
+test('favicon responses revalidate and change etag after refresh', function () {
+    fakeExampleSite(iconBody: samplePng(128, 10, 120, 200));
+
+    $master = $this->get('/i/example.com')->assertSuccessful();
+    $sized = $this->get('/i/example.com?sz=64')->assertSuccessful();
+
+    $masterEtag = $master->headers->get('ETag');
+    $sizedEtag = $sized->headers->get('ETag');
+
+    expect($masterEtag)->not->toBeEmpty()
+        ->and($sizedEtag)->not->toBeEmpty()
+        ->and($masterEtag)->not->toBe($sizedEtag);
+
+    expect($master->headers->get('Cache-Control'))
+        ->toContain('max-age=0')
+        ->toContain('must-revalidate');
+    expect($sized->headers->get('Cache-Control'))
+        ->toContain('max-age=0')
+        ->toContain('must-revalidate');
+    expect($master->headers->get('Last-Modified'))->not->toBeEmpty();
+    expect($sized->headers->get('Last-Modified'))->not->toBeEmpty();
+
+    $this->get('/i/example.com', ['If-None-Match' => $masterEtag])->assertNotModified();
+    $this->get('/i/example.com?sz=64', ['If-None-Match' => $sizedEtag])->assertNotModified();
+
+    $this->travel(1)->second();
+
+    Http::fake([
+        'https://example.com/' => Http::response(
+            '<html><head><link rel="icon" href="/icon-new.png" sizes="64x64"></head></html>',
+            200,
+            ['Content-Type' => 'text/html'],
+        ),
+        'https://example.com/icon-new.png' => Http::response(samplePng(96, 200, 40, 40), 200, ['Content-Type' => 'image/png']),
+        'https://example.com/favicon.ico' => Http::response(samplePng(16), 200, ['Content-Type' => 'image/png']),
+    ]);
+
+    $this->delete('/r/example.com')->assertSuccessful();
+
+    $masterAfter = $this->get('/i/example.com')->assertSuccessful();
+    $sizedAfter = $this->get('/i/example.com?sz=64')->assertSuccessful();
+
+    expect($masterAfter->headers->get('ETag'))->not->toBe($masterEtag)
+        ->and($sizedAfter->headers->get('ETag'))->not->toBe($sizedEtag);
+});
+
+test('favicon refresh is excluded from request forgery protection', function () {
+    $excluded = app(PreventRequestForgery::class)
+        ->getExcludedPaths();
+
+    expect($excluded)->toContain('r/*');
 });
 
 test('it rejects invalid domains and ssrf targets', function (string $domain) {
