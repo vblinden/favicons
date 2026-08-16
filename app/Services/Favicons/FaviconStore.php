@@ -36,7 +36,7 @@ class FaviconStore
             $this->disk()->delete($existing->storage_path);
         }
 
-        if ($resolved['status'] === 'fallback' || $resolved['contents'] === '') {
+        if ($resolved['contents'] === '') {
             $contents = $this->fallbackIconGenerator->generate($domain);
             $contentType = 'image/png';
             $extension = 'png';
@@ -50,7 +50,7 @@ class FaviconStore
             $extension = $this->extensionFor($contentType);
             $width = $resolved['width'];
             $height = $resolved['height'];
-            $status = 'ok';
+            $status = $resolved['status'];
             $sourceUrl = $resolved['source_url'];
         }
 
@@ -85,7 +85,7 @@ class FaviconStore
     {
         $size = max((int) config('favicons.min_size'), min((int) config('favicons.max_size'), $size));
 
-        if ($favicon->isFallback() || ! $favicon->storage_path || ! is_file($this->absolutePath($favicon))) {
+        if ($this->shouldGenerateLetterFallback($favicon) || ! $favicon->storage_path || ! is_file($this->absolutePath($favicon))) {
             return 'data:image/png;base64,'.base64_encode(
                 $this->fallbackIconGenerator->generate($favicon->domain, $size),
             );
@@ -115,7 +115,7 @@ class FaviconStore
         }
 
         if ($size !== null) {
-            if ($favicon->isFallback()) {
+            if ($this->shouldGenerateLetterFallback($favicon)) {
                 return response($this->fallbackIconGenerator->generate($favicon->domain, $size), 200, array_merge($this->cacheHeaders($etag), [
                     'Content-Type' => 'image/png',
                 ]));
@@ -154,7 +154,7 @@ class FaviconStore
     {
         $size = max((int) config('favicons.min_size'), min((int) config('favicons.max_size'), $size));
 
-        if ($favicon->isFallback()) {
+        if ($this->shouldGenerateLetterFallback($favicon)) {
             return $this->fallbackIconGenerator->generate($favicon->domain, $size);
         }
 
@@ -221,5 +221,13 @@ class FaviconStore
             str_contains($contentType, 'icon') => 'ico',
             default => 'bin',
         };
+    }
+
+    /**
+     * Letter tiles are only used when no remote fallback (e.g. Star Avatars) was stored.
+     */
+    private function shouldGenerateLetterFallback(Favicon $favicon): bool
+    {
+        return $favicon->isFallback() && $favicon->source_url === null;
     }
 }

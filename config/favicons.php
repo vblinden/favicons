@@ -46,6 +46,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Star Avatars Fallback
+    |--------------------------------------------------------------------------
+    |
+    | When a site has no usable favicon, fetch a deterministic PNG from
+    | Star Avatars before generating a local letter tile.
+    |
+    */
+
+    'staravatars' => [
+        'enabled' => (bool) env('FAVICONS_STARAVATARS_ENABLED', true),
+        'base_url' => env('FAVICONS_STARAVATARS_BASE_URL', 'https://staravatars.com'),
+        'size' => (int) env('FAVICONS_STARAVATARS_SIZE', 64),
+        'shape' => env('FAVICONS_STARAVATARS_SHAPE', 'rounded'),
+        'text_size' => env('FAVICONS_STARAVATARS_TEXT_SIZE', '2xl'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | HTTP Caching
     |--------------------------------------------------------------------------
     */

@@ -48,6 +48,12 @@ class FaviconResolver
             ];
         }
 
+        $starAvatar = $this->fetchStarAvatarFallback($domain);
+
+        if ($starAvatar !== null) {
+            return $starAvatar;
+        }
+
         return [
             'contents' => '',
             'content_type' => 'image/png',
@@ -56,6 +62,105 @@ class FaviconResolver
             'height' => null,
             'status' => 'fallback',
         ];
+    }
+
+    /**
+     * @return array{contents: string, content_type: string, source_url: string, width: int|null, height: int|null, status: string}|null
+     */
+    private function fetchStarAvatarFallback(string $domain): ?array
+    {
+        if (! (bool) config('favicons.staravatars.enabled', true)) {
+            return null;
+        }
+
+        $url = $this->starAvatarUrl($domain);
+        $downloaded = $this->downloadConfiguredIcon($url);
+
+        if ($downloaded === null) {
+            return null;
+        }
+
+        $normalized = $this->normalizeImage(
+            $downloaded['contents'],
+            $downloaded['content_type'],
+        );
+
+        if ($normalized === null || ! str_contains($normalized['content_type'], 'png')) {
+            return null;
+        }
+
+        return [
+            'contents' => $normalized['contents'],
+            'content_type' => $normalized['content_type'],
+            'source_url' => $url,
+            'width' => $normalized['width'],
+            'height' => $normalized['height'],
+            'status' => 'fallback',
+        ];
+    }
+
+    public function starAvatarUrl(string $domain): string
+    {
+        $baseUrl = rtrim((string) config('favicons.staravatars.base_url'), '/');
+        $size = max(
+            (int) config('favicons.min_size'),
+            min((int) config('favicons.max_size'), (int) config('favicons.staravatars.size')),
+        );
+
+        $query = array_filter([
+            'size' => $size,
+            'shape' => (string) config('favicons.staravatars.shape', 'rounded'),
+            'format' => 'png',
+            'text-size' => (string) config('favicons.staravatars.text_size', '2xl'),
+        ], fn ($value) => $value !== '' && $value !== null);
+
+        return $baseUrl.'/'.rawurlencode($domain).'?'.http_build_query($query);
+    }
+
+    /**
+     * Download an icon from a trusted configured URL (skips SSRF host checks).
+     *
+     * @return array{contents: string, content_type: string}|null
+     */
+    private function downloadConfiguredIcon(string $url): ?array
+    {
+        try {
+            $response = $this->client()
+                ->withOptions(['allow_redirects' => $this->redirectOptions()])
+                ->get($url);
+
+            if ($response->failed()) {
+                return null;
+            }
+
+            $contents = $response->body();
+
+            if ($contents === '') {
+                return null;
+            }
+
+            $contentType = strtolower((string) ($response->header('Content-Type') ?: ''));
+            $contentType = trim(explode(';', $contentType)[0]);
+
+            if ($contentType === '' || str_contains($contentType, 'text/html')) {
+                $contentType = $this->guessContentType($url, $contents);
+            }
+
+            if (! str_starts_with($contentType, 'image/') && $contentType !== 'image/svg+xml') {
+                if (! $this->looksLikeImage($contents)) {
+                    return null;
+                }
+
+                $contentType = $this->guessContentType($url, $contents);
+            }
+
+            return [
+                'contents' => $contents,
+                'content_type' => $contentType,
+            ];
+        } catch (ConnectionException|RequestException) {
+            return null;
+        }
     }
 
     /**

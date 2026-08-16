@@ -111,17 +111,62 @@ test('it falls back to favicon.ico when html has no icons', function () {
         ->toBe('https://example.com/favicon.ico');
 });
 
-test('it serves a letter fallback when nothing is found', function () {
+test('it falls back to staravatars png when the site has no icon', function () {
+    $png = samplePng(64, 30, 80, 200);
+
     Http::fake([
         'https://example.com/*' => Http::response('nope', 404),
         'http://example.com/*' => Http::response('nope', 404),
+        'https://staravatars.com/*' => Http::response($png, 200, ['Content-Type' => 'image/png']),
     ]);
 
     $response = $this->get('/i/example.com');
 
     $response->assertSuccessful();
     expect($response->headers->get('Content-Type'))->toStartWith('image/png');
-    expect(Favicon::query()->where('domain', 'example.com')->value('status'))->toBe('fallback');
+
+    $favicon = Favicon::query()->where('domain', 'example.com')->first();
+
+    expect($favicon)->not->toBeNull()
+        ->and($favicon->status)->toBe('fallback')
+        ->and($favicon->source_url)->toContain('staravatars.com')
+        ->and($favicon->source_url)->toContain('format=png')
+        ->and($favicon->content_type)->toBe('image/png');
+});
+
+test('it resizes a staravatars fallback with the sz query parameter', function () {
+    $png = samplePng(64, 30, 80, 200);
+
+    Http::fake([
+        'https://example.com/*' => Http::response('nope', 404),
+        'http://example.com/*' => Http::response('nope', 404),
+        'https://staravatars.com/*' => Http::response($png, 200, ['Content-Type' => 'image/png']),
+    ]);
+
+    $response = $this->get('/i/example.com?sz=32');
+
+    $response->assertSuccessful();
+
+    $image = imagecreatefromstring($response->getContent());
+    expect($image)->not->toBeFalse();
+    expect(imagesx($image))->toBe(32)
+        ->and(imagesy($image))->toBe(32);
+    imagedestroy($image);
+});
+
+test('it serves a letter fallback when site and staravatars both fail', function () {
+    Http::fake([
+        'https://example.com/*' => Http::response('nope', 404),
+        'http://example.com/*' => Http::response('nope', 404),
+        'https://staravatars.com/*' => Http::response('nope', 404),
+    ]);
+
+    $response = $this->get('/i/example.com');
+
+    $response->assertSuccessful();
+    expect($response->headers->get('Content-Type'))->toStartWith('image/png');
+    expect(Favicon::query()->where('domain', 'example.com')->value('status'))->toBe('fallback')
+        ->and(Favicon::query()->where('domain', 'example.com')->value('source_url'))->toBeNull();
 });
 
 test('it resizes with the sz query parameter', function () {
