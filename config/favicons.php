@@ -76,4 +76,12 @@ return [
 
     'fetch_lock_seconds' => (int) env('FAVICONS_FETCH_LOCK_SECONDS', 30),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Leaderboard
+    |--------------------------------------------------------------------------
+    */
+
+    'leaderboard_limit' => (int) env('FAVICONS_LEADERBOARD_LIMIT', 50),
+
 ];

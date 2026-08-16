@@ -56,6 +56,13 @@
                     <span class="text-[#9b1c1c]">DELETE</span>
                     <code class="ml-2 break-all text-ink">{{ url('/r/github.com') }}</code>
                 </p>
+                <p class="text-ink-soft">
+                    <span class="text-accent">GET</span>
+                    <a
+                        href="{{ route('leaderboard') }}"
+                        class="ml-2 break-all text-ink underline decoration-accent/40 underline-offset-4 transition hover:decoration-accent"
+                    >{{ url('/leaderboard') }}</a>
+                </p>
             </div>
         </main>
     </body>

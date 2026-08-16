@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Database\Factories\FaviconFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -28,6 +30,7 @@ class Favicon extends Model
     protected $attributes = [
         'status' => 'fallback',
         'content_type' => 'image/png',
+        'request_count' => 0,
     ];
 
     /**
@@ -38,6 +41,7 @@ class Favicon extends Model
         return [
             'width' => 'integer',
             'height' => 'integer',
+            'request_count' => 'integer',
             'fetched_at' => 'datetime',
         ];
     }
@@ -50,5 +54,23 @@ class Favicon extends Model
     public function isFallback(): bool
     {
         return $this->status === 'fallback';
+    }
+
+    public function recordRequest(): void
+    {
+        static::query()->whereKey($this->getKey())->increment('request_count');
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    #[Scope]
+    protected function mostRequested(Builder $query): Builder
+    {
+        return $query
+            ->where('request_count', '>', 0)
+            ->orderByDesc('request_count')
+            ->orderBy('domain');
     }
 }

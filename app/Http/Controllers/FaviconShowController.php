@@ -16,6 +16,8 @@ class FaviconShowController extends Controller
     ): Response {
         $favicon = $favicons->getOrFetch($request->domain());
 
+        defer(fn () => $favicon->recordRequest());
+
         return $store->response($favicon, $request->size());
     }
 }

@@ -26,7 +26,15 @@ class FaviconFactory extends Factory
             'height' => 32,
             'status' => 'ok',
             'fetched_at' => now(),
+            'request_count' => 0,
         ];
+    }
+
+    public function requested(int $times = 1): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'request_count' => $times,
+        ]);
     }
 
     public function fallback(): static

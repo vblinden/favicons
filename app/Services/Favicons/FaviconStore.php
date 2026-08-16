@@ -81,6 +81,25 @@ class FaviconStore
         return $this->disk()->get($favicon->storage_path);
     }
 
+    public function dataUri(Favicon $favicon, int $size = 64): string
+    {
+        $size = max((int) config('favicons.min_size'), min((int) config('favicons.max_size'), $size));
+
+        if ($favicon->isFallback() || ! $favicon->storage_path || ! is_file($this->absolutePath($favicon))) {
+            return 'data:image/png;base64,'.base64_encode(
+                $this->fallbackIconGenerator->generate($favicon->domain, $size),
+            );
+        }
+
+        if ($favicon->content_type === 'image/svg+xml') {
+            return 'data:image/svg+xml;base64,'.base64_encode($this->contents($favicon));
+        }
+
+        $contents = $this->resize($favicon, $size) ?? $this->contents($favicon);
+
+        return 'data:image/png;base64,'.base64_encode($contents);
+    }
+
     public function response(Favicon $favicon, ?int $size = null): Response
     {
         $etag = '"'.hash('sha256', $favicon->domain.'|'.$favicon->fetched_at?->timestamp.'|'.($size ?? 'master')).'"';
