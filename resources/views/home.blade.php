@@ -64,6 +64,8 @@
                     >{{ url('/leaderboard') }}</a>
                 </p>
             </div>
+
+            <x-site-footer class="animate-rise-delay-3 mt-16" />
         </main>
     </body>
 </html>

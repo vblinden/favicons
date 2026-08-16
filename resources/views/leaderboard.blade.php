@@ -59,6 +59,8 @@
                     @endforeach
                 </ol>
             @endif
+
+            <x-site-footer class="mt-16" />
         </main>
     </body>
 </html>
