@@ -59,7 +59,6 @@ return [
         'base_url' => env('FAVICONS_STARAVATARS_BASE_URL', 'https://staravatars.com'),
         'size' => (int) env('FAVICONS_STARAVATARS_SIZE', 64),
         'shape' => env('FAVICONS_STARAVATARS_SHAPE', 'rounded'),
-        'text_size' => env('FAVICONS_STARAVATARS_TEXT_SIZE', '2xl'),
     ],
 
     /*

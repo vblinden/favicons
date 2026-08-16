@@ -13,6 +13,7 @@ class FaviconResolver
     public function __construct(
         private DomainNormalizer $normalizer,
         private IcoDecoder $icoDecoder,
+        private FallbackIconGenerator $fallbackIconGenerator,
     ) {}
 
     /**
@@ -111,7 +112,7 @@ class FaviconResolver
             'size' => $size,
             'shape' => (string) config('favicons.staravatars.shape', 'rounded'),
             'format' => 'png',
-            'text-size' => (string) config('favicons.staravatars.text_size', '2xl'),
+            'initials' => $this->fallbackIconGenerator->letterFor($domain),
         ], fn ($value) => $value !== '' && $value !== null);
 
         return $baseUrl.'/'.rawurlencode($domain).'?'.http_build_query($query);

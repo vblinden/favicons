@@ -131,6 +131,8 @@ test('it falls back to staravatars png when the site has no icon', function () {
         ->and($favicon->status)->toBe('fallback')
         ->and($favicon->source_url)->toContain('staravatars.com')
         ->and($favicon->source_url)->toContain('format=png')
+        ->and($favicon->source_url)->toContain('initials=E')
+        ->and($favicon->source_url)->not->toContain('text-size')
         ->and($favicon->content_type)->toBe('image/png');
 });
 
