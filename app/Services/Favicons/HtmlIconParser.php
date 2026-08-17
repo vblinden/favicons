@@ -11,7 +11,7 @@ class HtmlIconParser
     ) {}
 
     /**
-     * @return list<array{url: string, score: int}>
+     * @return list<array{url: string, score: int, theme: string}>
      */
     public function parse(string $html, string $baseUrl): array
     {
@@ -53,10 +53,35 @@ class HtmlIconParser
             $icons[] = [
                 'url' => $absolute,
                 'score' => $score,
+                'theme' => $this->colorSchemeFromMedia($this->attribute($tag, 'media')),
             ];
         }
 
         return $icons;
+    }
+
+    /**
+     * Classify a link media query into dark, light, or any (theme-agnostic).
+     */
+    public function colorSchemeFromMedia(?string $media): string
+    {
+        if ($media === null || trim($media) === '') {
+            return 'any';
+        }
+
+        $media = strtolower($media);
+        $hasDark = (bool) preg_match('/prefers-color-scheme\s*:\s*dark/', $media);
+        $hasLight = (bool) preg_match('/prefers-color-scheme\s*:\s*light/', $media);
+
+        if ($hasDark && ! $hasLight) {
+            return 'dark';
+        }
+
+        if ($hasLight && ! $hasDark) {
+            return 'light';
+        }
+
+        return 'any';
     }
 
     /**

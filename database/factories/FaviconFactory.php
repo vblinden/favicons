@@ -19,8 +19,9 @@ class FaviconFactory extends Factory
 
         return [
             'domain' => $domain,
+            'theme' => 'default',
             'source_url' => 'https://'.$domain.'/favicon.ico',
-            'storage_path' => hash('sha256', $domain).'.png',
+            'storage_path' => hash('sha256', $domain.'|default').'.png',
             'content_type' => 'image/png',
             'width' => 32,
             'height' => 32,
@@ -34,6 +35,22 @@ class FaviconFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'request_count' => $times,
+        ]);
+    }
+
+    public function dark(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'theme' => 'dark',
+            'storage_path' => hash('sha256', ($attributes['domain'] ?? 'example.com').'|dark').'.png',
+        ]);
+    }
+
+    public function light(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'theme' => 'light',
+            'storage_path' => hash('sha256', ($attributes['domain'] ?? 'example.com').'|light').'.png',
         ]);
     }
 

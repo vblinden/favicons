@@ -17,13 +17,14 @@ class FaviconRefreshController extends Controller
         FaviconStore $store,
     ): Response {
         $domain = $request->domain();
-        $key = 'favicon-refresh:'.$request->ip().':'.$domain;
+        $theme = $request->theme();
+        $key = 'favicon-refresh:'.$request->ip().':'.$domain.':'.$theme->value;
 
         $response = RateLimiter::attempt(
             $key,
             (int) config('favicons.refresh_max_attempts'),
-            function () use ($favicons, $store, $domain, $request) {
-                $favicon = $favicons->refresh($domain);
+            function () use ($favicons, $store, $domain, $theme, $request) {
+                $favicon = $favicons->refresh($domain, $theme);
 
                 return $store->response(
                     $favicon,

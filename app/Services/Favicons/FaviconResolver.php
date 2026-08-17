@@ -2,6 +2,7 @@
 
 namespace App\Services\Favicons;
 
+use App\Enums\FaviconTheme;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
@@ -23,9 +24,9 @@ class FaviconResolver
     /**
      * @return array{contents: string, content_type: string, source_url: string|null, width: int|null, height: int|null, status: string}
      */
-    public function resolve(string $domain): array
+    public function resolve(string $domain, FaviconTheme $theme = FaviconTheme::Default): array
     {
-        $candidates = $this->discoverCandidates($domain);
+        $candidates = $this->discoverCandidates($domain, $theme);
 
         foreach ($candidates as $candidate) {
             $downloaded = $this->download($candidate['url'], (int) config('favicons.max_icon_bytes'));
@@ -70,9 +71,9 @@ class FaviconResolver
     }
 
     /**
-     * @return list<array{url: string, score: int}>
+     * @return list<array{url: string, score: int, theme: string}>
      */
-    public function discoverCandidates(string $domain): array
+    public function discoverCandidates(string $domain, FaviconTheme $theme = FaviconTheme::Default): array
     {
         $candidates = [];
         $htmlResult = $this->fetchHtml($domain);
@@ -86,9 +87,15 @@ class FaviconResolver
         $candidates[] = [
             'url' => 'https://'.$domain.'/favicon.ico',
             'score' => 10,
+            'theme' => 'any',
         ];
 
-        usort($candidates, fn (array $a, array $b) => $b['score'] <=> $a['score']);
+        usort($candidates, function (array $a, array $b) use ($theme): int {
+            $boostedA = $a['score'] + $this->themeBoost($a['theme'] ?? 'any', $theme);
+            $boostedB = $b['score'] + $this->themeBoost($b['theme'] ?? 'any', $theme);
+
+            return $boostedB <=> $boostedA;
+        });
 
         $unique = [];
         $seen = [];
@@ -107,6 +114,27 @@ class FaviconResolver
         }
 
         return $unique;
+    }
+
+    private function themeBoost(string $candidateTheme, FaviconTheme $requested): int
+    {
+        return match ($requested) {
+            FaviconTheme::Dark => match ($candidateTheme) {
+                'dark' => 1_000_000,
+                'any' => 100_000,
+                default => 0,
+            },
+            FaviconTheme::Light => match ($candidateTheme) {
+                'light' => 1_000_000,
+                'any' => 100_000,
+                default => 0,
+            },
+            FaviconTheme::Default => match ($candidateTheme) {
+                'any' => 1_000_000,
+                'light' => 100_000,
+                default => 0,
+            },
+        };
     }
 
     /**

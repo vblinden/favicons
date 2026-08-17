@@ -19,7 +19,6 @@ class LeaderboardController extends Controller
             60,
             function () use ($limit) {
                 return Favicon::query()
-                    ->select(['id', 'domain', 'request_count'])
                     ->mostRequested()
                     ->limit($limit)
                     ->get()
@@ -27,7 +26,7 @@ class LeaderboardController extends Controller
                     ->map(fn (Favicon $favicon, int $index) => [
                         'rank' => $index + 1,
                         'domain' => $favicon->domain,
-                        'request_count' => $favicon->request_count,
+                        'request_count' => (int) $favicon->request_count,
                         'preview' => route('favicons.show', ['domain' => $favicon->domain, 'sz' => 32]),
                     ])
                     ->all();

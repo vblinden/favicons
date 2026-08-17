@@ -6,7 +6,9 @@ Favicons is an HTTP image API. Request a domain and receive a favicon image resp
 API:
 - `GET /i/{domain}` — return a favicon for `{domain}` (letters, digits, `.`, `-` only)
 - `GET /i/{domain}?sz={size}` — optional square size from 16 to 512 (default 32)
+- `GET /i/{domain}?theme=dark|light` — prefer icons declared with `media="(prefers-color-scheme: …)"`
 - `DELETE /r/{domain}` — force-refresh the cached favicon for `{domain}` (rate limited per IP + domain)
+- `DELETE /r/{domain}?theme=dark|light` — force-refresh a themed cache entry
 - `GET /leaderboard` — HTML list of most-requested domains
 
 ## Docs

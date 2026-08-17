@@ -2,6 +2,7 @@
 
 namespace App\Services\Favicons;
 
+use App\Enums\FaviconTheme;
 use App\Exceptions\FetchRateLimitedException;
 use App\Jobs\RefreshFaviconJob;
 use App\Models\Favicon;
@@ -15,46 +16,49 @@ class FaviconService
         private FaviconStore $store,
     ) {}
 
-    public function getOrFetch(string $domain, string $clientIp): Favicon
+    public function getOrFetch(string $domain, string $clientIp, FaviconTheme $theme = FaviconTheme::Default): Favicon
     {
-        $existing = $this->store->find($domain);
+        $existing = $this->store->find($domain, $theme);
 
         if ($this->isFresh($existing)) {
             return $existing;
         }
 
         if ($this->store->canRasterize($existing)) {
-            RefreshFaviconJob::dispatch($domain);
+            RefreshFaviconJob::dispatch($domain, $theme);
 
             return $existing;
         }
 
         $this->assertCanFetch($clientIp);
 
-        return $this->fetchAndPersist($domain, force: false);
+        return $this->fetchAndPersist($domain, $theme, force: false);
     }
 
-    public function refresh(string $domain): Favicon
+    public function refresh(string $domain, FaviconTheme $theme = FaviconTheme::Default): Favicon
     {
-        return $this->fetchAndPersist($domain, force: true);
+        return $this->fetchAndPersist($domain, $theme, force: true);
     }
 
-    private function fetchAndPersist(string $domain, bool $force): Favicon
+    private function fetchAndPersist(string $domain, FaviconTheme $theme, bool $force): Favicon
     {
-        $lock = Cache::lock('favicon:fetch:'.$domain, (int) config('favicons.fetch_lock_seconds'));
+        $lock = Cache::lock(
+            'favicon:fetch:'.$domain.':'.$theme->value,
+            (int) config('favicons.fetch_lock_seconds'),
+        );
 
-        return $lock->block((int) config('favicons.fetch_lock_seconds'), function () use ($domain, $force) {
+        return $lock->block((int) config('favicons.fetch_lock_seconds'), function () use ($domain, $theme, $force) {
             if (! $force) {
-                $existing = $this->store->find($domain);
+                $existing = $this->store->find($domain, $theme);
 
                 if ($this->isFresh($existing)) {
                     return $existing;
                 }
             }
 
-            $resolved = $this->resolver->resolve($domain);
+            $resolved = $this->resolver->resolve($domain, $theme);
 
-            return $this->store->persist($domain, $resolved);
+            return $this->store->persist($domain, $resolved, $theme);
         });
     }
 

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
     'domain',
+    'theme',
     'source_url',
     'storage_path',
     'content_type',
@@ -28,6 +29,7 @@ class Favicon extends Model
      * @var array<string, mixed>
      */
     protected $attributes = [
+        'theme' => 'default',
         'status' => 'fallback',
         'content_type' => 'image/png',
         'request_count' => 0,
@@ -69,7 +71,9 @@ class Favicon extends Model
     protected function mostRequested(Builder $query): Builder
     {
         return $query
-            ->where('request_count', '>', 0)
+            ->selectRaw('domain, SUM(request_count) as request_count')
+            ->groupBy('domain')
+            ->havingRaw('SUM(request_count) > 0')
             ->orderByDesc('request_count')
             ->orderBy('domain');
     }

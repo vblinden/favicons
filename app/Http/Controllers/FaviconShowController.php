@@ -17,7 +17,7 @@ class FaviconShowController extends Controller
         FaviconStore $store,
     ): Response {
         try {
-            $favicon = $favicons->getOrFetch($request->domain(), (string) $request->ip());
+            $favicon = $favicons->getOrFetch($request->domain(), (string) $request->ip(), $request->theme());
         } catch (FetchRateLimitedException $exception) {
             return response('Too Many Requests', HttpResponse::HTTP_TOO_MANY_REQUESTS, [
                 'Retry-After' => (string) $exception->retryAfter,

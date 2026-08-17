@@ -2,6 +2,7 @@
 
 namespace App\Services\Favicons;
 
+use App\Enums\FaviconTheme;
 use App\Models\Favicon;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Cache;
@@ -21,9 +22,12 @@ class FaviconStore
         return Storage::disk((string) config('favicons.disk'));
     }
 
-    public function find(string $domain): ?Favicon
+    public function find(string $domain, FaviconTheme $theme = FaviconTheme::Default): ?Favicon
     {
-        return Favicon::query()->where('domain', $domain)->first();
+        return Favicon::query()
+            ->where('domain', $domain)
+            ->where('theme', $theme->value)
+            ->first();
     }
 
     public function hasStoredFile(?Favicon $favicon): bool
@@ -60,9 +64,9 @@ class FaviconStore
     /**
      * @param  array{contents: string, content_type: string, source_url: string|null, width: int|null, height: int|null, status: string}  $resolved
      */
-    public function persist(string $domain, array $resolved): Favicon
+    public function persist(string $domain, array $resolved, FaviconTheme $theme = FaviconTheme::Default): Favicon
     {
-        $existing = $this->find($domain);
+        $existing = $this->find($domain, $theme);
 
         if ($existing?->storage_path) {
             $this->disk()->delete($existing->storage_path);
@@ -86,11 +90,14 @@ class FaviconStore
             $sourceUrl = $resolved['source_url'];
         }
 
-        $path = hash('sha256', $domain).'.'.$extension;
+        $path = hash('sha256', $domain.'|'.$theme->value).'.'.$extension;
         $this->disk()->put($path, $contents);
 
         $favicon = Favicon::query()->updateOrCreate(
-            ['domain' => $domain],
+            [
+                'domain' => $domain,
+                'theme' => $theme->value,
+            ],
             [
                 'source_url' => $sourceUrl,
                 'storage_path' => $path,
@@ -107,7 +114,10 @@ class FaviconStore
 
     public function etag(Favicon $favicon, int $size): string
     {
-        return '"'.hash('sha256', $favicon->domain.'|'.$favicon->fetched_at?->timestamp.'|'.$size.'|'.config('favicons.image_revision')).'"';
+        return '"'.hash(
+            'sha256',
+            $favicon->domain.'|'.$favicon->theme.'|'.$favicon->fetched_at?->timestamp.'|'.$size.'|'.config('favicons.image_revision'),
+        ).'"';
     }
 
     public function response(Favicon $favicon, int $size, ?string $ifNoneMatch = null, bool $recordRequest = false): Response

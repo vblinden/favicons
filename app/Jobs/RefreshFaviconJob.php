@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\FaviconTheme;
 use App\Services\Favicons\FaviconService;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,22 +23,26 @@ class RefreshFaviconJob implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 60;
 
-    public function __construct(public string $domain) {}
+    public function __construct(
+        public string $domain,
+        public FaviconTheme $theme = FaviconTheme::Default,
+    ) {}
 
     public function uniqueId(): string
     {
-        return $this->domain;
+        return $this->domain.'|'.$this->theme->value;
     }
 
     public function handle(FaviconService $favicons): void
     {
-        $favicons->refresh($this->domain);
+        $favicons->refresh($this->domain, $this->theme);
     }
 
     public function failed(?Throwable $exception): void
     {
         Log::warning('Favicon refresh job failed', [
             'domain' => $this->domain,
+            'theme' => $this->theme->value,
             'error' => $exception?->getMessage(),
         ]);
     }

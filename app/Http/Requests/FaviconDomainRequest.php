@@ -2,10 +2,12 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\FaviconTheme;
 use App\Services\Favicons\DomainNormalizer;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 
 class FaviconDomainRequest extends FormRequest
 {
@@ -21,6 +23,7 @@ class FaviconDomainRequest extends FormRequest
     {
         return [
             'sz' => ['sometimes', 'nullable', 'integer', 'min:'.config('favicons.min_size'), 'max:'.config('favicons.max_size')],
+            'theme' => ['sometimes', 'nullable', 'string', Rule::in(['dark', 'light'])],
         ];
     }
 
@@ -47,10 +50,23 @@ class FaviconDomainRequest extends FormRequest
         return $size === null ? (int) config('favicons.default_size') : (int) $size;
     }
 
+    public function theme(): FaviconTheme
+    {
+        $theme = $this->validated('theme');
+
+        return $theme === null
+            ? FaviconTheme::Default
+            : FaviconTheme::from($theme);
+    }
+
     protected function prepareForValidation(): void
     {
         if ($this->query->has('sz') && $this->query('sz') === '') {
             $this->merge(['sz' => null]);
+        }
+
+        if ($this->query->has('theme') && $this->query('theme') === '') {
+            $this->merge(['theme' => null]);
         }
     }
 

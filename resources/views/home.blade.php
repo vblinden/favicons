@@ -53,8 +53,15 @@
                     <code class="text-ink">?sz=64</code>
                     <span class="text-ink-soft/70">(default 32)</span>
                 </p>
+                <p class="text-ink-soft/80">
+                    Optional theme:
+                    <code class="text-ink">?theme=dark</code>
+                    <span class="text-ink-soft/70">or</span>
+                    <code class="text-ink">?theme=light</code>
+                    <span class="text-ink-soft/70">(prefers site icons with matching media)</span>
+                </p>
                 <p class="text-ink-soft">
-                    <span class="text-[#9b1c1c]">DELETE</span>
+                    <span class="text-danger">DELETE</span>
                     <code class="ml-2 break-all text-ink">{{ url('/r/github.com') }}</code>
                 </p>
                 <p class="text-ink-soft">

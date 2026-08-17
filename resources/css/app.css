@@ -16,10 +16,24 @@
     --color-paper-deep: #dde5ea;
     --color-accent: #0f7a6c;
     --color-accent-bright: #14a090;
+    --color-danger: #9b1c1c;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --color-ink: #e8eef2;
+        --color-ink-soft: #9aafbd;
+        --color-paper: #0f161c;
+        --color-paper-deep: #1c2833;
+        --color-accent: #2ec4b0;
+        --color-accent-bright: #5eead4;
+        --color-danger: #f87171;
+    }
 }
 
 @layer base {
     html {
+        color-scheme: light dark;
         scroll-behavior: smooth;
     }
 
@@ -41,6 +55,15 @@
             radial-gradient(ellipse 80% 50% at 10% -10%, rgb(20 122 108 / 0.16), transparent 55%),
             radial-gradient(ellipse 60% 40% at 100% 0%, rgb(20 33 43 / 0.07), transparent 50%),
             linear-gradient(180deg, rgb(221 229 234 / 0.7), transparent 42%);
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .bg-mesh {
+            background-image:
+                radial-gradient(ellipse 80% 50% at 10% -10%, rgb(46 196 176 / 0.2), transparent 55%),
+                radial-gradient(ellipse 60% 40% at 100% 0%, rgb(232 238 242 / 0.05), transparent 50%),
+                linear-gradient(180deg, rgb(28 40 51 / 0.85), transparent 42%);
+        }
     }
 
     .animate-rise {
