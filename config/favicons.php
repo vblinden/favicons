@@ -84,11 +84,29 @@ return [
     | previous PNG.
     */
 
-    'image_revision' => (int) env('FAVICONS_IMAGE_REVISION', 2),
+    'image_revision' => (int) env('FAVICONS_IMAGE_REVISION', 3),
 
     'variant_cache_seconds' => (int) env('FAVICONS_VARIANT_CACHE_SECONDS', 86400),
 
     'ttl_seconds' => (int) env('FAVICONS_TTL_SECONDS', 2592000),
+
+    /*
+    | Fallback masters (Star Avatars / letter tiles) are retried sooner so a
+    | temporary fetch failure does not stick for the full cache TTL.
+    */
+
+    'fallback_ttl_seconds' => (int) env('FAVICONS_FALLBACK_TTL_SECONDS', 86400),
+
+    /*
+    | SHA-1 digests of icon bodies we refuse to serve (raw or PNG-normalized).
+    | The Laravel skeleton favicon.ico is common on apps that only ship an SVG
+    | logo; keeping it makes unrelated sites look like Laravel.
+    */
+
+    'rejected_content_sha1' => [
+        '4de5db574e6c589ef763ce57c4061f2269648ca4',
+        '4ef41ff73f045d319c84db457971e316d2c5360e',
+    ],
 
     /*
     |--------------------------------------------------------------------------

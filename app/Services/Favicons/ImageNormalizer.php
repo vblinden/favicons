@@ -13,7 +13,7 @@ class ImageNormalizer
      */
     public function normalize(string $contents, string $contentType): ?array
     {
-        if ($this->looksLikeSvg($contents, $contentType)) {
+        if ($this->looksLikeSvg($contents, $contentType) || $this->isRejectedContent($contents)) {
             return null;
         }
 
@@ -35,12 +35,30 @@ class ImageNormalizer
         imagepng($image);
         imagedestroy($image);
 
+        $png = (string) ob_get_clean();
+
+        if ($this->isRejectedContent($png)) {
+            return null;
+        }
+
         return [
-            'contents' => (string) ob_get_clean(),
+            'contents' => $png,
             'content_type' => 'image/png',
             'width' => $width,
             'height' => $height,
         ];
+    }
+
+    public function isRejectedContent(string $contents): bool
+    {
+        /** @var list<string> $hashes */
+        $hashes = config('favicons.rejected_content_sha1', []);
+
+        if ($hashes === [] || $contents === '') {
+            return false;
+        }
+
+        return in_array(sha1($contents), $hashes, true);
     }
 
     public function guessContentType(string $url, string $contents): string

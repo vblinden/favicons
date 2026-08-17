@@ -2,6 +2,9 @@
 
 use App\Services\Favicons\IcoDecoder;
 use App\Services\Favicons\ImageNormalizer;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 function samplePngBytes(int $size = 16): string
 {
@@ -33,4 +36,14 @@ test('it converts raster bytes to png', function () {
         ->and($normalized['content_type'])->toBe('image/png')
         ->and($normalized['width'])->toBe(16)
         ->and($normalized['height'])->toBe(16);
+});
+
+test('it rejects configured stock icon digests', function () {
+    $png = samplePngBytes();
+    config(['favicons.rejected_content_sha1' => [sha1($png)]]);
+
+    $normalizer = new ImageNormalizer(new IcoDecoder);
+
+    expect($normalizer->isRejectedContent($png))->toBeTrue()
+        ->and($normalizer->normalize($png, 'image/png'))->toBeNull();
 });

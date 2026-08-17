@@ -124,7 +124,9 @@ class HtmlIconParser
             return null;
         }
 
-        return $match[1] !== '' ? $match[1] : ($match[2] !== '' ? $match[2] : $match[3]);
+        $value = $match[1] !== '' ? $match[1] : ($match[2] !== '' ? $match[2] : $match[3]);
+
+        return html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 
     private function absolutize(string $href, string $baseUrl): ?string

@@ -13,6 +13,7 @@ class FaviconStore
     public function __construct(
         private FallbackIconGenerator $fallbackIconGenerator,
         private IcoDecoder $icoDecoder,
+        private ImageNormalizer $imageNormalizer,
     ) {}
 
     public function disk(): Filesystem
@@ -41,7 +42,19 @@ class FaviconStore
         $contentType = strtolower((string) $favicon->content_type);
         $path = strtolower((string) $favicon->storage_path);
 
-        return ! str_contains($contentType, 'svg') && ! str_ends_with($path, '.svg');
+        if (str_contains($contentType, 'svg') || str_ends_with($path, '.svg')) {
+            return false;
+        }
+
+        $cacheKey = 'favicon:rasterizable:'.$favicon->id.':'.$favicon->fetched_at?->timestamp;
+
+        return (bool) Cache::remember($cacheKey, 86400, function () use ($favicon) {
+            $contents = $this->disk()->get($favicon->storage_path);
+
+            return $contents !== null
+                && $contents !== ''
+                && ! $this->imageNormalizer->isRejectedContent($contents);
+        });
     }
 
     /**
