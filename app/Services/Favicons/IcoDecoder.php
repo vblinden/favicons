@@ -22,7 +22,7 @@ class IcoDecoder
             return false;
         }
 
-        $best = null;
+        $frames = [];
 
         for ($i = 0; $i < $header['count']; $i++) {
             $entryOffset = 6 + ($i * 16);
@@ -46,28 +46,45 @@ class IcoDecoder
                 continue;
             }
 
-            $frame = substr($contents, $offset, $size);
-            $score = $width * $height;
+            $frames[] = [
+                'width' => $width,
+                'height' => $height,
+                'bitCount' => $entry['bitCount'],
+                'frame' => substr($contents, $offset, $size),
+            ];
+        }
 
-            if ($best === null || $score > $best['score']) {
-                $best = [
-                    'score' => $score,
-                    'width' => $width,
-                    'height' => $height,
-                    'frame' => $frame,
-                ];
+        usort($frames, function (array $a, array $b): int {
+            $scoreA = $a['width'] * $a['height'];
+            $scoreB = $b['width'] * $b['height'];
+
+            if ($scoreA !== $scoreB) {
+                return $scoreB <=> $scoreA;
+            }
+
+            $pngA = str_starts_with($a['frame'], "\x89PNG") ? 1 : 0;
+            $pngB = str_starts_with($b['frame'], "\x89PNG") ? 1 : 0;
+
+            if ($pngA !== $pngB) {
+                return $pngB <=> $pngA;
+            }
+
+            return $b['bitCount'] <=> $a['bitCount'];
+        });
+
+        foreach ($frames as $candidate) {
+            if (str_starts_with($candidate['frame'], "\x89PNG")) {
+                $image = @imagecreatefromstring($candidate['frame']);
+            } else {
+                $image = $this->bmpFrameToImage($candidate['frame'], $candidate['width'], $candidate['height']);
+            }
+
+            if ($image !== false) {
+                return $image;
             }
         }
 
-        if ($best === null) {
-            return false;
-        }
-
-        if (str_starts_with($best['frame'], "\x89PNG")) {
-            return @imagecreatefromstring($best['frame']);
-        }
-
-        return $this->bmpFrameToImage($best['frame'], $best['width'], $best['height']);
+        return false;
     }
 
     /**
@@ -80,34 +97,65 @@ class IcoDecoder
         }
 
         $header = unpack(
-            'VheaderSize/Vwidth/Vheight/vplanes/vbitCount/Vcompression',
-            substr($frame, 0, 26),
+            'VheaderSize/Vwidth/Vheight/vplanes/vbitCount/Vcompression/VsizeImage/Vxppm/Vyppm/VcolorsUsed',
+            substr($frame, 0, 40),
         );
 
-        if ($header === false || $header['headerSize'] < 40) {
+        if ($header === false || $header['headerSize'] < 40 || $header['compression'] !== 0) {
             return false;
         }
 
         $bitCount = $header['bitCount'];
-        $dibHeight = (int) abs($header['height']);
-        $imageHeight = (int) ($dibHeight / 2);
 
-        if ($imageHeight < 1) {
-            $imageHeight = $height;
+        if (! in_array($bitCount, [1, 4, 8, 24, 32], true)) {
+            return false;
         }
 
+        $dibHeight = (int) abs($header['height']);
         $imageWidth = $header['width'] > 0 ? (int) $header['width'] : $width;
 
-        if ($bitCount !== 32 || $header['compression'] !== 0) {
-            return false;
+        if ($height > 0 && $dibHeight === $height * 2) {
+            $imageHeight = $height;
+        } elseif ($height > 0 && $dibHeight === $height) {
+            $imageHeight = $height;
+        } else {
+            $imageHeight = max(1, intdiv($dibHeight, 2) ?: $dibHeight);
         }
 
+        $palette = [];
         $pixelOffset = $header['headerSize'];
-        $pixelBytes = $imageWidth * $imageHeight * 4;
 
-        if (strlen($frame) < $pixelOffset + $pixelBytes) {
+        if ($bitCount <= 8) {
+            $paletteCount = $header['colorsUsed'] > 0 ? $header['colorsUsed'] : (1 << $bitCount);
+            $paletteBytes = $paletteCount * 4;
+
+            if (strlen($frame) < $pixelOffset + $paletteBytes) {
+                return false;
+            }
+
+            for ($i = 0; $i < $paletteCount; $i++) {
+                $index = $pixelOffset + ($i * 4);
+                $palette[] = [
+                    ord($frame[$index + 2]),
+                    ord($frame[$index + 1]),
+                    ord($frame[$index]),
+                ];
+            }
+
+            $pixelOffset += $paletteBytes;
+        }
+
+        $xorStride = ((int) (($imageWidth * $bitCount + 31) / 32)) * 4;
+        $andStride = ((int) (($imageWidth + 31) / 32)) * 4;
+        $xorBytes = $xorStride * $imageHeight;
+        $andBytes = $andStride * $imageHeight;
+
+        if (strlen($frame) < $pixelOffset + $xorBytes) {
             return false;
         }
+
+        $andOffset = $pixelOffset + $xorBytes;
+        $hasAndMask = $bitCount < 32 && strlen($frame) >= $andOffset + $andBytes;
 
         $image = imagecreatetruecolor($imageWidth, $imageHeight);
 
@@ -121,18 +169,64 @@ class IcoDecoder
         imagefill($image, 0, 0, $transparent);
 
         for ($y = 0; $y < $imageHeight; $y++) {
+            $row = $pixelOffset + (($imageHeight - 1 - $y) * $xorStride);
+
             for ($x = 0; $x < $imageWidth; $x++) {
-                $index = $pixelOffset + ((($imageHeight - 1 - $y) * $imageWidth) + $x) * 4;
-                $b = ord($frame[$index]);
-                $g = ord($frame[$index + 1]);
-                $r = ord($frame[$index + 2]);
-                $a = ord($frame[$index + 3]);
-                $alpha = 127 - (int) floor($a / 2);
-                $color = imagecolorallocatealpha($image, $r, $g, $b, $alpha);
+                if ($hasAndMask && $this->andMaskIsTransparent($frame, $andOffset, $andStride, $imageWidth, $imageHeight, $x, $y)) {
+                    continue;
+                }
+
+                [$r, $g, $b, $a] = $this->pixelAt($frame, $row, $x, $bitCount, $palette);
+                $color = imagecolorallocatealpha($image, $r, $g, $b, $a);
                 imagesetpixel($image, $x, $y, $color);
             }
         }
 
         return $image;
+    }
+
+    /**
+     * @param  list<array{0: int, 1: int, 2: int}>  $palette
+     * @return array{0: int, 1: int, 2: int, 3: int}
+     */
+    private function pixelAt(string $frame, int $row, int $x, int $bitCount, array $palette): array
+    {
+        if ($bitCount === 32) {
+            $index = $row + ($x * 4);
+            $b = ord($frame[$index]);
+            $g = ord($frame[$index + 1]);
+            $r = ord($frame[$index + 2]);
+            $a = 127 - (int) floor(ord($frame[$index + 3]) / 2);
+
+            return [$r, $g, $b, $a];
+        }
+
+        if ($bitCount === 24) {
+            $index = $row + ($x * 3);
+
+            return [ord($frame[$index + 2]), ord($frame[$index + 1]), ord($frame[$index]), 0];
+        }
+
+        $paletteIndex = match ($bitCount) {
+            1 => (ord($frame[$row + intdiv($x, 8)]) >> (7 - ($x % 8))) & 0x01,
+            4 => (ord($frame[$row + intdiv($x, 2)]) >> ($x % 2 === 0 ? 4 : 0)) & 0x0F,
+            default => ord($frame[$row + $x]),
+        };
+
+        $color = $palette[$paletteIndex] ?? [0, 0, 0];
+
+        return [$color[0], $color[1], $color[2], 0];
+    }
+
+    private function andMaskIsTransparent(string $frame, int $andOffset, int $andStride, int $width, int $height, int $x, int $y): bool
+    {
+        $row = $andOffset + (($height - 1 - $y) * $andStride);
+        $byte = $row + intdiv($x, 8);
+
+        if ($byte >= strlen($frame)) {
+            return false;
+        }
+
+        return ((ord($frame[$byte]) >> (7 - ($x % 8))) & 0x01) === 1;
     }
 }

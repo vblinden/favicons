@@ -30,7 +30,7 @@ return [
 
     'max_redirects' => (int) env('FAVICONS_MAX_REDIRECTS', 5),
 
-    'max_html_bytes' => (int) env('FAVICONS_MAX_HTML_BYTES', 524288),
+    'max_html_bytes' => (int) env('FAVICONS_MAX_HTML_BYTES', 2097152),
 
     'max_icon_bytes' => (int) env('FAVICONS_MAX_ICON_BYTES', 2097152),
 

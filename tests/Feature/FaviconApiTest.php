@@ -217,6 +217,31 @@ test('it resizes ico masters without falling back to a letter tile', function ()
         ->and(Favicon::query()->where('domain', 'example.com')->value('content_type'))->toBe('image/png');
 });
 
+test('it uses a 32-bit ico frame when an earlier paletted frame of the same size cannot be decoded', function () {
+    $png = samplePng(32, 10, 180, 40);
+    $badBmp = str_repeat("\0", 40);
+    $offset0 = 6 + (2 * 16);
+    $offset1 = $offset0 + strlen($badBmp);
+    $ico = pack('vvv', 0, 1, 2)
+        .pack('CCCCvvVV', 32, 32, 16, 0, 1, 4, strlen($badBmp), $offset0)
+        .pack('CCCCvvVV', 32, 32, 0, 0, 1, 32, strlen($png), $offset1)
+        .$badBmp
+        .$png;
+
+    Http::fake([
+        'https://example.com/' => Http::response('<html></html>', 200, ['Content-Type' => 'text/html']),
+        'https://example.com/favicon.ico' => Http::response($ico, 200, ['Content-Type' => 'image/vnd.microsoft.icon']),
+        'https://staravatars.com/*' => Http::response('missing', 404),
+    ]);
+
+    $response = $this->get('/i/example.com')->assertSuccessful();
+
+    expect($response->headers->get('Content-Type'))->toStartWith('image/png');
+    expect(Favicon::query()->where('domain', 'example.com')->value('status'))->toBe('ok')
+        ->and(Favicon::query()->where('domain', 'example.com')->value('source_url'))
+        ->toBe('https://example.com/favicon.ico');
+});
+
 test('it refreshes a favicon and rate limits after five attempts per week', function () {
     fakeExampleSite();
 
