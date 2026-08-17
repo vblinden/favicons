@@ -5,6 +5,7 @@ use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 
@@ -242,6 +243,46 @@ test('it uses a 32-bit ico frame when an earlier paletted frame of the same size
         ->toBe('https://example.com/favicon.ico');
 });
 
+test('it refetches a cached svg master instead of serving a letter tile', function () {
+    Queue::fake();
+
+    $path = hash('sha256', 'example.com').'.svg';
+    Storage::disk('favicons')->put($path, '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+
+    Favicon::factory()->create([
+        'domain' => 'example.com',
+        'source_url' => 'https://example.com/icon.svg',
+        'storage_path' => $path,
+        'content_type' => 'image/svg+xml',
+        'status' => 'ok',
+        'fetched_at' => now(),
+    ]);
+
+    Http::fake([
+        'https://example.com/' => Http::response(
+            '<html><head><link rel="icon" href="/icon.png"></head></html>',
+            200,
+            ['Content-Type' => 'text/html'],
+        ),
+        'https://example.com/icon.png' => Http::response(samplePng(32, 10, 10, 10), 200, ['Content-Type' => 'image/png']),
+        'https://example.com/favicon.ico' => Http::response('missing', 404),
+        'https://staravatars.com/*' => Http::response('missing', 404),
+    ]);
+
+    $response = $this->get('/i/example.com')->assertSuccessful();
+
+    expect($response->headers->get('Content-Type'))->toStartWith('image/png')
+        ->and($response->getContent())->not->toContain('<svg');
+
+    $favicon = Favicon::query()->where('domain', 'example.com')->first();
+
+    expect($favicon->status)->toBe('ok')
+        ->and($favicon->content_type)->toBe('image/png')
+        ->and($favicon->source_url)->toBe('https://example.com/icon.png');
+
+    Queue::assertNothingPushed();
+});
+
 test('it refreshes a favicon and rate limits after five attempts per week', function () {
     fakeExampleSite();
 
@@ -312,6 +353,21 @@ test('favicon responses revalidate and change etag after refresh', function () {
 
     expect($masterAfter->headers->get('ETag'))->not->toBe($masterEtag)
         ->and($sizedAfter->headers->get('ETag'))->not->toBe($sizedEtag);
+});
+
+test('it changes the etag when the image revision changes', function () {
+    fakeExampleSite();
+
+    $first = $this->get('/i/example.com')->assertSuccessful();
+    $etag = $first->headers->get('ETag');
+
+    config(['favicons.image_revision' => (int) config('favicons.image_revision') + 1]);
+
+    $second = $this->get('/i/example.com')->assertSuccessful();
+
+    expect($second->headers->get('ETag'))->not->toBe($etag);
+
+    $this->get('/i/example.com', ['If-None-Match' => $etag])->assertSuccessful();
 });
 
 test('favicon refresh is excluded from request forgery protection', function () {

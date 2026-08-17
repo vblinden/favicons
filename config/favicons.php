@@ -78,6 +78,14 @@ return [
 
     'stale_while_revalidate' => (int) env('FAVICONS_STALE_WHILE_REVALIDATE', 86400),
 
+    /*
+    | Bump this when served image bytes change without fetched_at changing
+    | (for example an ICO decoder fix) so browsers do not keep a 304 of the
+    | previous PNG.
+    */
+
+    'image_revision' => (int) env('FAVICONS_IMAGE_REVISION', 2),
+
     'variant_cache_seconds' => (int) env('FAVICONS_VARIANT_CACHE_SECONDS', 86400),
 
     'ttl_seconds' => (int) env('FAVICONS_TTL_SECONDS', 2592000),

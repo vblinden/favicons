@@ -23,7 +23,7 @@ class FaviconService
             return $existing;
         }
 
-        if ($this->store->hasStoredFile($existing)) {
+        if ($this->store->canRasterize($existing)) {
             RefreshFaviconJob::dispatch($domain);
 
             return $existing;
@@ -60,7 +60,7 @@ class FaviconService
 
     private function isFresh(?Favicon $favicon): bool
     {
-        if ($favicon === null || ! $this->store->hasStoredFile($favicon)) {
+        if ($favicon === null || ! $this->store->canRasterize($favicon)) {
             return false;
         }
 

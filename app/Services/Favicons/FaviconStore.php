@@ -32,6 +32,18 @@ class FaviconStore
             && $this->disk()->exists($favicon->storage_path);
     }
 
+    public function canRasterize(?Favicon $favicon): bool
+    {
+        if (! $this->hasStoredFile($favicon)) {
+            return false;
+        }
+
+        $contentType = strtolower((string) $favicon->content_type);
+        $path = strtolower((string) $favicon->storage_path);
+
+        return ! str_contains($contentType, 'svg') && ! str_ends_with($path, '.svg');
+    }
+
     /**
      * @param  array{contents: string, content_type: string, source_url: string|null, width: int|null, height: int|null, status: string}  $resolved
      */
@@ -82,7 +94,7 @@ class FaviconStore
 
     public function etag(Favicon $favicon, int $size): string
     {
-        return '"'.hash('sha256', $favicon->domain.'|'.$favicon->fetched_at?->timestamp.'|'.$size).'"';
+        return '"'.hash('sha256', $favicon->domain.'|'.$favicon->fetched_at?->timestamp.'|'.$size.'|'.config('favicons.image_revision')).'"';
     }
 
     public function response(Favicon $favicon, int $size, ?string $ifNoneMatch = null, bool $recordRequest = false): Response
@@ -154,7 +166,7 @@ class FaviconStore
     {
         $size = $this->clampSize($size);
 
-        $key = 'favicon:variant:'.$favicon->id.':'.$size.':'.$favicon->fetched_at?->timestamp;
+        $key = 'favicon:variant:'.$favicon->id.':'.$size.':'.$favicon->fetched_at?->timestamp.':'.config('favicons.image_revision');
 
         return Cache::remember(
             $key,
