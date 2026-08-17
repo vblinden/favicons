@@ -30,6 +30,10 @@ return [
 
     'max_redirects' => (int) env('FAVICONS_MAX_REDIRECTS', 5),
 
+    'max_html_bytes' => (int) env('FAVICONS_MAX_HTML_BYTES', 524288),
+
+    'max_icon_bytes' => (int) env('FAVICONS_MAX_ICON_BYTES', 2097152),
+
     /*
     |--------------------------------------------------------------------------
     | Image Sizes
@@ -74,6 +78,10 @@ return [
 
     'stale_while_revalidate' => (int) env('FAVICONS_STALE_WHILE_REVALIDATE', 86400),
 
+    'variant_cache_seconds' => (int) env('FAVICONS_VARIANT_CACHE_SECONDS', 86400),
+
+    'ttl_seconds' => (int) env('FAVICONS_TTL_SECONDS', 2592000),
+
     /*
     |--------------------------------------------------------------------------
     | Refresh Rate Limit
@@ -87,6 +95,19 @@ return [
     'refresh_max_attempts' => (int) env('FAVICONS_REFRESH_MAX_ATTEMPTS', 5),
 
     'refresh_decay_seconds' => (int) env('FAVICONS_REFRESH_DECAY_SECONDS', 604800),
+
+    /*
+    |--------------------------------------------------------------------------
+    | First-fetch Rate Limit
+    |--------------------------------------------------------------------------
+    |
+    | Cold cache misses that trigger an outbound crawl are limited per IP.
+    |
+    */
+
+    'fetch_max_attempts' => (int) env('FAVICONS_FETCH_MAX_ATTEMPTS', 30),
+
+    'fetch_decay_seconds' => (int) env('FAVICONS_FETCH_DECAY_SECONDS', 60),
 
     /*
     |--------------------------------------------------------------------------

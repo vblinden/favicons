@@ -4,8 +4,8 @@ namespace App\Services\Favicons;
 
 use App\Models\Favicon;
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class FaviconStore
@@ -23,6 +23,13 @@ class FaviconStore
     public function find(string $domain): ?Favicon
     {
         return Favicon::query()->where('domain', $domain)->first();
+    }
+
+    public function hasStoredFile(?Favicon $favicon): bool
+    {
+        return $favicon !== null
+            && filled($favicon->storage_path)
+            && $this->disk()->exists($favicon->storage_path);
     }
 
     /**
@@ -57,7 +64,7 @@ class FaviconStore
         $path = hash('sha256', $domain).'.'.$extension;
         $this->disk()->put($path, $contents);
 
-        return Favicon::query()->updateOrCreate(
+        $favicon = Favicon::query()->updateOrCreate(
             ['domain' => $domain],
             [
                 'source_url' => $sourceUrl,
@@ -69,101 +76,47 @@ class FaviconStore
                 'fetched_at' => now(),
             ],
         );
+
+        return $favicon;
     }
 
-    public function absolutePath(Favicon $favicon): string
+    public function etag(Favicon $favicon, int $size): string
     {
-        return $this->disk()->path($favicon->storage_path);
+        return '"'.hash('sha256', $favicon->domain.'|'.$favicon->fetched_at?->timestamp.'|'.$size).'"';
     }
 
-    public function contents(Favicon $favicon): string
+    public function response(Favicon $favicon, int $size, ?string $ifNoneMatch = null, bool $recordRequest = false): Response
     {
-        return $this->disk()->get($favicon->storage_path);
-    }
+        $size = $this->clampSize($size);
+        $etag = $this->etag($favicon, $size);
+        $headers = $this->headers($favicon, $etag);
 
-    public function dataUri(Favicon $favicon, int $size = 64): string
-    {
-        $size = max((int) config('favicons.min_size'), min((int) config('favicons.max_size'), $size));
-
-        if ($this->shouldGenerateLetterFallback($favicon) || ! $favicon->storage_path || ! is_file($this->absolutePath($favicon))) {
-            return 'data:image/png;base64,'.base64_encode(
-                $this->fallbackIconGenerator->generate($favicon->domain, $size),
-            );
-        }
-
-        if ($favicon->content_type === 'image/svg+xml') {
-            return 'data:image/svg+xml;base64,'.base64_encode($this->contents($favicon));
-        }
-
-        $contents = $this->resize($favicon, $size) ?? $this->contents($favicon);
-
-        return 'data:image/png;base64,'.base64_encode($contents);
-    }
-
-    public function response(Favicon $favicon, ?int $size = null): Response
-    {
-        $etag = '"'.hash('sha256', $favicon->domain.'|'.$favicon->fetched_at?->timestamp.'|'.($size ?? 'master')).'"';
-        $headers = $this->cacheHeaders($favicon, $etag);
-
-        if (request()->headers->get('If-None-Match') === $etag) {
+        if ($ifNoneMatch === $etag) {
             return response('', 304, $headers);
         }
 
-        if ($favicon->content_type === 'image/svg+xml') {
-            return response($this->contents($favicon), 200, array_merge($headers, [
-                'Content-Type' => 'image/svg+xml',
-            ]));
+        $contents = $this->variantContents($favicon, $size);
+
+        if ($recordRequest) {
+            defer(fn () => $favicon->recordRequest());
         }
 
-        if ($size !== null) {
-            if ($this->shouldGenerateLetterFallback($favicon)) {
-                return response($this->fallbackIconGenerator->generate($favicon->domain, $size), 200, array_merge($headers, [
-                    'Content-Type' => 'image/png',
-                ]));
-            }
-
-            $resized = $this->resize($favicon, $size);
-
-            if ($resized !== null) {
-                return response($resized, 200, array_merge($headers, [
-                    'Content-Type' => 'image/png',
-                ]));
-            }
-
-            // Unresizable master (rare) — serve original bytes instead of a letter tile.
-        }
-
-        $path = $this->absolutePath($favicon);
-
-        if (! is_file($path)) {
-            $contents = $this->fallbackIconGenerator->generate($favicon->domain);
-
-            return response($contents, 200, array_merge($headers, [
-                'Content-Type' => 'image/png',
-            ]));
-        }
-
-        /** @var BinaryFileResponse $response */
-        $response = response()->file($path, array_merge($headers, [
-            'Content-Type' => $favicon->content_type,
-        ]));
-
-        return $response;
+        return response($contents, 200, $headers);
     }
 
     public function resize(Favicon $favicon, int $size): ?string
     {
-        $size = max((int) config('favicons.min_size'), min((int) config('favicons.max_size'), $size));
+        $size = $this->clampSize($size);
 
         if ($this->shouldGenerateLetterFallback($favicon)) {
             return $this->fallbackIconGenerator->generate($favicon->domain, $size);
         }
 
-        if ($favicon->content_type === 'image/svg+xml') {
-            return null;
+        if (! $this->hasStoredFile($favicon)) {
+            return $this->fallbackIconGenerator->generate($favicon->domain, $size);
         }
 
-        $contents = $this->contents($favicon);
+        $contents = $this->disk()->get($favicon->storage_path);
         $image = @imagecreatefromstring($contents);
 
         if ($image === false) {
@@ -197,16 +150,36 @@ class FaviconStore
         return (string) ob_get_clean();
     }
 
+    private function variantContents(Favicon $favicon, int $size): string
+    {
+        $size = $this->clampSize($size);
+
+        $key = 'favicon:variant:'.$favicon->id.':'.$size.':'.$favicon->fetched_at?->timestamp;
+
+        return Cache::remember(
+            $key,
+            (int) config('favicons.variant_cache_seconds'),
+            function () use ($favicon, $size) {
+                return $this->resize($favicon, $size)
+                    ?? $this->fallbackIconGenerator->generate($favicon->domain, $size);
+            },
+        );
+    }
+
     /**
      * @return array<string, string>
      */
-    private function cacheHeaders(Favicon $favicon, string $etag): array
+    private function headers(Favicon $favicon, string $etag): array
     {
         $stale = (int) config('favicons.stale_while_revalidate');
 
         $headers = [
             'Cache-Control' => "public, max-age=0, must-revalidate, stale-while-revalidate={$stale}",
             'ETag' => $etag,
+            'Content-Type' => 'image/png',
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+            'Content-Disposition' => 'inline; filename="favicon.png"',
         ];
 
         if ($favicon->fetched_at !== null) {
@@ -216,22 +189,23 @@ class FaviconStore
         return $headers;
     }
 
+    private function clampSize(int $size): int
+    {
+        return max((int) config('favicons.min_size'), min((int) config('favicons.max_size'), $size));
+    }
+
     private function extensionFor(string $contentType): string
     {
         return match (true) {
-            str_contains($contentType, 'svg') => 'svg',
             str_contains($contentType, 'png') => 'png',
             str_contains($contentType, 'jpeg'), str_contains($contentType, 'jpg') => 'jpg',
             str_contains($contentType, 'gif') => 'gif',
             str_contains($contentType, 'webp') => 'webp',
             str_contains($contentType, 'icon') => 'ico',
-            default => 'bin',
+            default => 'png',
         };
     }
 
-    /**
-     * Letter tiles are only used when no remote fallback (e.g. Star Avatars) was stored.
-     */
     private function shouldGenerateLetterFallback(Favicon $favicon): bool
     {
         return $favicon->isFallback() && $favicon->source_url === null;

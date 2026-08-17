@@ -2,8 +2,13 @@
 
 use App\Models\Favicon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Cache::flush();
+});
 
 test('the leaderboard ranks domains by request count', function () {
     Favicon::factory()->requested(3)->create(['domain' => 'bronze.example']);
@@ -19,6 +24,7 @@ test('the leaderboard ranks domains by request count', function () {
             'silver.example',
             'bronze.example',
         ], false)
+        ->assertSee('/i/gold.example', false)
         ->assertDontSee('unused.example', false)
         ->assertSee('10', false)
         ->assertSee('5', false)

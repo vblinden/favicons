@@ -3,12 +3,14 @@
 use App\Models\Favicon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Storage::fake('favicons');
+    RateLimiter::clear('favicon-fetch:127.0.0.1');
 });
 
 test('serving a favicon increments its request count', function () {
@@ -31,6 +33,7 @@ test('serving a favicon increments its request count', function () {
         ),
         'https://example.com/icon.png' => Http::response($png, 200, ['Content-Type' => 'image/png']),
         'https://example.com/favicon.ico' => Http::response($png, 200, ['Content-Type' => 'image/png']),
+        'https://staravatars.com/*' => Http::response('missing', 404),
     ]);
 
     $this->get('/i/example.com')->assertSuccessful();

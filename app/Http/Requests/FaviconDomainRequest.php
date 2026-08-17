@@ -28,9 +28,8 @@ class FaviconDomainRequest extends FormRequest
     {
         $validator->after(function (Validator $validator): void {
             $domain = (string) $this->route('domain');
-            $normalizer = app(DomainNormalizer::class);
 
-            if (! $normalizer->isValid($domain)) {
+            if (! $this->normalizer()->isValid($domain)) {
                 $validator->errors()->add('domain', 'The domain is invalid.');
             }
         });
@@ -38,14 +37,14 @@ class FaviconDomainRequest extends FormRequest
 
     public function domain(): string
     {
-        return app(DomainNormalizer::class)->normalize((string) $this->route('domain'));
+        return $this->normalizer()->normalize((string) $this->route('domain'));
     }
 
-    public function size(): ?int
+    public function size(): int
     {
         $size = $this->validated('sz');
 
-        return $size === null ? null : (int) $size;
+        return $size === null ? (int) config('favicons.default_size') : (int) $size;
     }
 
     protected function prepareForValidation(): void
@@ -60,5 +59,10 @@ class FaviconDomainRequest extends FormRequest
         throw new HttpResponseException(
             response($validator->errors()->first() ?: 'Invalid request', 422),
         );
+    }
+
+    private function normalizer(): DomainNormalizer
+    {
+        return $this->container->make(DomainNormalizer::class);
     }
 }

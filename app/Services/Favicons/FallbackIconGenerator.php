@@ -2,6 +2,8 @@
 
 namespace App\Services\Favicons;
 
+use Illuminate\Support\Str;
+
 class FallbackIconGenerator
 {
     public function generate(string $domain, ?int $size = null): string
@@ -51,13 +53,13 @@ class FallbackIconGenerator
     public function letterFor(string $domain): string
     {
         $host = preg_replace('/^www\./i', '', $domain) ?? $domain;
-        $first = substr($host, 0, 1);
+        $first = Str::substr($host, 0, 1);
 
-        if ($first === false || $first === '') {
+        if ($first === '') {
             return '?';
         }
 
-        return strtoupper($first);
+        return Str::upper($first);
     }
 
     /**

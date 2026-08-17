@@ -25,7 +25,11 @@ class FaviconRefreshController extends Controller
             function () use ($favicons, $store, $domain, $request) {
                 $favicon = $favicons->refresh($domain);
 
-                return $store->response($favicon, $request->size());
+                return $store->response(
+                    $favicon,
+                    $request->size(),
+                    $request->headers->get('If-None-Match'),
+                );
             },
             (int) config('favicons.refresh_decay_seconds'),
         );

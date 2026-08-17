@@ -7,5 +7,6 @@ test('the application returns a successful response', function () {
         ->assertSee('Favicons', false)
         ->assertSee('/i/github.com', false)
         ->assertSee('/r/github.com', false)
-        ->assertSee('/leaderboard', false);
+        ->assertSee('/leaderboard', false)
+        ->assertSee('default 32', false);
 });

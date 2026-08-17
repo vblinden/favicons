@@ -12,8 +12,10 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Storage::fake('favicons');
+    Http::preventStrayRequests();
     RateLimiter::clear('favicon-refresh:127.0.0.1:example.com');
     RateLimiter::clear('favicon-refresh:127.0.0.1:www.example.com');
+    RateLimiter::clear('favicon-fetch:127.0.0.1');
 });
 
 function samplePng(int $size = 32, int $r = 220, int $g = 40, int $b = 40): string
@@ -48,6 +50,7 @@ function fakeExampleSite(?string $html = null, ?string $iconBody = null): void
         'https://www.example.com/' => Http::response($html, 200, ['Content-Type' => 'text/html']),
         'https://www.example.com/icon.png' => Http::response($iconBody, 200, ['Content-Type' => 'image/png']),
         'https://www.example.com/favicon.ico' => Http::response($iconBody, 200, ['Content-Type' => 'image/png']),
+        'https://staravatars.com/*' => Http::response('missing', 404),
     ]);
 }
 
@@ -104,6 +107,7 @@ test('it falls back to favicon.ico when html has no icons', function () {
     Http::fake([
         'https://example.com/' => Http::response('<html><head><title>x</title></head></html>', 200, ['Content-Type' => 'text/html']),
         'https://example.com/favicon.ico' => Http::response($png, 200, ['Content-Type' => 'image/png']),
+        'https://staravatars.com/*' => Http::response('missing', 404),
     ]);
 
     $this->get('/i/example.com')->assertSuccessful();
@@ -196,6 +200,7 @@ test('it resizes ico masters without falling back to a letter tile', function ()
     Http::fake([
         'https://example.com/' => Http::response('<html></html>', 200, ['Content-Type' => 'text/html']),
         'https://example.com/favicon.ico' => Http::response($ico, 200, ['Content-Type' => 'image/x-icon']),
+        'https://staravatars.com/*' => Http::response('missing', 404),
     ]);
 
     $response = $this->get('/i/example.com?sz=64');
@@ -226,6 +231,7 @@ test('it refreshes a favicon and rate limits after five attempts per week', func
             ),
             'https://example.com/icon-'.$i.'.png' => Http::response(samplePng(48, $i * 20, 100, 150), 200, ['Content-Type' => 'image/png']),
             'https://example.com/favicon.ico' => Http::response(samplePng(16), 200, ['Content-Type' => 'image/png']),
+            'https://staravatars.com/*' => Http::response('missing', 404),
         ]);
 
         $this->delete('/r/example.com')->assertSuccessful();
@@ -271,6 +277,7 @@ test('favicon responses revalidate and change etag after refresh', function () {
         ),
         'https://example.com/icon-new.png' => Http::response(samplePng(96, 200, 40, 40), 200, ['Content-Type' => 'image/png']),
         'https://example.com/favicon.ico' => Http::response(samplePng(16), 200, ['Content-Type' => 'image/png']),
+        'https://staravatars.com/*' => Http::response('missing', 404),
     ]);
 
     $this->delete('/r/example.com')->assertSuccessful();

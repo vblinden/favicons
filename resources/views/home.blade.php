@@ -51,6 +51,7 @@
                 <p class="text-ink-soft/80">
                     Optional size:
                     <code class="text-ink">?sz=64</code>
+                    <span class="text-ink-soft/70">(default 32)</span>
                 </p>
                 <p class="text-ink-soft">
                     <span class="text-[#9b1c1c]">DELETE</span>
