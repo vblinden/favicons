@@ -6,6 +6,7 @@ class ImageNormalizer
 {
     public function __construct(
         private IcoDecoder $icoDecoder,
+        private SvgRasterizer $svgRasterizer,
     ) {}
 
     /**
@@ -13,8 +14,22 @@ class ImageNormalizer
      */
     public function normalize(string $contents, string $contentType): ?array
     {
-        if ($this->looksLikeSvg($contents, $contentType) || $this->isRejectedContent($contents)) {
+        if ($this->isRejectedContent($contents)) {
             return null;
+        }
+
+        if ($this->looksLikeSvg($contents, $contentType)) {
+            $rasterized = $this->svgRasterizer->toPng(
+                $contents,
+                (int) config('favicons.svg_raster_size', 128),
+            );
+
+            if ($rasterized === null) {
+                return null;
+            }
+
+            $contents = $rasterized;
+            $contentType = 'image/png';
         }
 
         $image = @imagecreatefromstring($contents);

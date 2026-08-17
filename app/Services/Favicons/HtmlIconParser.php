@@ -37,15 +37,22 @@ class HtmlIconParser
 
             $absolute = $this->absolutize($href, $baseUrl);
 
-            if ($absolute === null || $this->looksLikeSvg($absolute) || ! $this->urlGuard->isAllowedUrl($absolute)) {
+            if ($absolute === null || ! $this->urlGuard->isAllowedUrl($absolute)) {
                 continue;
             }
 
             $sizes = $this->attribute($tag, 'sizes');
+            $score = $this->scoreIcon($relTokens, $sizes);
+
+            // Prefer SVG icons when declared — browsers do the same. Raster
+            // fallbacks (apple-touch / ico) remain as lower-scored candidates.
+            if ($this->looksLikeSvg($absolute)) {
+                $score = max($score, 100);
+            }
 
             $icons[] = [
                 'url' => $absolute,
-                'score' => $this->scoreIcon($relTokens, $sizes),
+                'score' => $score,
             ];
         }
 

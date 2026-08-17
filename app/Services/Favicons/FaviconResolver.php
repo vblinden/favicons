@@ -233,10 +233,8 @@ class FaviconResolver
             }
 
             if ($this->imageNormalizer->looksLikeSvg($contents, $contentType)) {
-                return null;
-            }
-
-            if (! str_starts_with($contentType, 'image/')) {
+                $contentType = 'image/svg+xml';
+            } elseif (! str_starts_with($contentType, 'image/')) {
                 if (! $this->imageNormalizer->looksLikeImage($contents)) {
                     return null;
                 }

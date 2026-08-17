@@ -84,7 +84,13 @@ return [
     | previous PNG.
     */
 
-    'image_revision' => (int) env('FAVICONS_IMAGE_REVISION', 3),
+    'image_revision' => (int) env('FAVICONS_IMAGE_REVISION', 4),
+
+    /*
+    | Target edge length when rasterizing SVG masters with Imagick.
+    */
+
+    'svg_raster_size' => (int) env('FAVICONS_SVG_RASTER_SIZE', 128),
 
     'variant_cache_seconds' => (int) env('FAVICONS_VARIANT_CACHE_SECONDS', 86400),
 

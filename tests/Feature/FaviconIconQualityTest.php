@@ -116,6 +116,37 @@ test('it refetches a cached laravel skeleton master on the next request', functi
         ->and($favicon->source_url)->toStartWith('https://staravatars.com/');
 });
 
+test('it prefers rasterizable svg icons over apple touch png', function () {
+    $embedded = qualitySamplePng(48, 12, 34, 56);
+    $apple = qualitySamplePng(180, 200, 10, 10);
+    $svg = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
+        .'<image xlink:href="data:image/png;base64,'.base64_encode($embedded).'"/></svg>';
+
+    Http::fake([
+        'https://example.com/' => Http::response(
+            '<html><head>'
+            .'<link rel="icon" href="/logo.svg" type="image/svg+xml">'
+            .'<link rel="apple-touch-icon" href="/apple.png">'
+            .'</head></html>',
+            200,
+            ['Content-Type' => 'text/html'],
+        ),
+        'https://example.com/logo.svg' => Http::response($svg, 200, ['Content-Type' => 'image/svg+xml']),
+        'https://example.com/apple.png' => Http::response($apple, 200, ['Content-Type' => 'image/png']),
+        'https://example.com/favicon.ico' => Http::response('missing', 404),
+        'https://staravatars.com/*' => Http::response('missing', 404),
+    ]);
+
+    $this->get('/i/example.com')->assertSuccessful();
+
+    expect(Favicon::query()->where('domain', 'example.com')->value('source_url'))
+        ->toBe('https://example.com/logo.svg')
+        ->and(Favicon::query()->where('domain', 'example.com')->value('status'))
+        ->toBe('ok')
+        ->and(Favicon::query()->where('domain', 'example.com')->value('content_type'))
+        ->toBe('image/png');
+});
+
 test('it retries fallback masters after the fallback ttl', function () {
     config(['favicons.fallback_ttl_seconds' => 60]);
 
