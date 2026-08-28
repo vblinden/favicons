@@ -40,6 +40,52 @@
                 @endforeach
             </div>
 
+            <form
+                id="favicon-playground"
+                class="animate-rise-delay-2 mt-12 space-y-4"
+                action="{{ route('favicons.show', ['domain' => 'example.com']) }}"
+                method="get"
+            >
+                <label for="playground-domain" class="block text-sm font-medium text-ink-soft">
+                    Try a domain
+                </label>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <input
+                        id="playground-domain"
+                        name="domain"
+                        type="text"
+                        value="github.com"
+                        autocomplete="off"
+                        spellcheck="false"
+                        class="w-full rounded-lg border border-ink/10 bg-paper-deep/60 px-4 py-3 font-mono text-sm text-ink outline-none ring-accent focus:ring-2 sm:max-w-xs"
+                    >
+                    <button
+                        type="submit"
+                        class="rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition hover:bg-accent-bright"
+                    >
+                        Preview
+                    </button>
+                </div>
+                <div class="flex flex-wrap items-center gap-4">
+                    <img
+                        id="playground-preview"
+                        src="{{ route('favicons.show', ['domain' => 'github.com', 'sz' => 64]) }}"
+                        alt="Preview favicon"
+                        width="48"
+                        height="48"
+                        class="size-12 rounded-lg bg-paper-deep/80 p-1"
+                    >
+                    <code id="playground-snippet" class="block max-w-full overflow-x-auto rounded-lg bg-paper-deep/70 px-3 py-2 font-mono text-xs text-ink sm:text-sm">&lt;img src="{{ url('/i/github.com') }}" alt="" width="32" height="32"&gt;</code>
+                    <button
+                        type="button"
+                        id="playground-copy"
+                        class="rounded-lg border border-ink/15 px-3 py-2 text-xs font-medium text-ink-soft transition hover:border-accent hover:text-accent"
+                    >
+                        Copy
+                    </button>
+                </div>
+            </form>
+
             <div class="animate-rise-delay-3 mt-12 space-y-4 font-mono text-sm sm:text-base">
                 <p class="text-ink-soft">
                     <span class="text-accent">GET</span>
@@ -58,7 +104,25 @@
                     <code class="text-ink">?theme=dark</code>
                     <span class="text-ink-soft/70">or</span>
                     <code class="text-ink">?theme=light</code>
-                    <span class="text-ink-soft/70">(prefers site icons with matching media)</span>
+                </p>
+                <p class="text-ink-soft/80">
+                    Optional format:
+                    <code class="text-ink">?format=webp</code>
+                </p>
+                <p class="text-ink-soft">
+                    <span class="text-accent">GET</span>
+                    <code class="ml-2 break-all text-ink">{{ url('/m/github.com') }}</code>
+                    <span class="text-ink-soft/70">metadata</span>
+                </p>
+                <p class="text-ink-soft">
+                    <span class="text-accent">GET</span>
+                    <code class="ml-2 break-all text-ink">{{ url('/b?domains=github.com,laravel.com') }}</code>
+                    <span class="text-ink-soft/70">batch</span>
+                </p>
+                <p class="text-ink-soft">
+                    <span class="text-accent">GET</span>
+                    <code class="ml-2 break-all text-ink">{{ url('/s2/favicons?domain=github.com&sz=64') }}</code>
+                    <span class="text-ink-soft/70">Google-compatible</span>
                 </p>
                 <p class="text-ink-soft">
                     <span class="text-danger">DELETE</span>

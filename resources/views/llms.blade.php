@@ -7,6 +7,10 @@ API:
 - `GET /i/{domain}` — return a favicon for `{domain}` (letters, digits, `.`, `-` only)
 - `GET /i/{domain}?sz={size}` — optional square size from 16 to 512 (default 32)
 - `GET /i/{domain}?theme=dark|light` — prefer icons declared with `media="(prefers-color-scheme: …)"`
+- `GET /i/{domain}?format=webp|png` — optional output format (default PNG)
+- `GET /m/{domain}` — JSON metadata (`status`, `source_url`, dimensions, image URL)
+- `GET /b?domains=a.com,b.com` — batch JSON of image URLs (optional `sz`, `theme`, `format`)
+- `GET /s2/favicons?domain={domain}&sz={size}` — Google-compatible alias
 - `DELETE /r/{domain}` — force-refresh the cached favicon for `{domain}` (rate limited per IP + domain)
 - `DELETE /r/{domain}?theme=dark|light` — force-refresh a themed cache entry
 - `GET /leaderboard` — HTML list of most-requested domains

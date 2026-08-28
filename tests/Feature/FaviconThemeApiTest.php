@@ -53,6 +53,7 @@ function fakeThemedExampleSite(): array
         'https://example.com/light.png' => Http::response($lightPng, 200, ['Content-Type' => 'image/png']),
         'https://example.com/dark.png' => Http::response($darkPng, 200, ['Content-Type' => 'image/png']),
         'https://example.com/favicon.ico' => Http::response($anyPng, 200, ['Content-Type' => 'image/png']),
+        'https://example.com/*' => Http::response('missing', 404),
         'https://staravatars.com/*' => Http::response('missing', 404),
     ]);
 

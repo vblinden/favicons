@@ -24,12 +24,13 @@ class FaviconRefreshController extends Controller
             $key,
             (int) config('favicons.refresh_max_attempts'),
             function () use ($favicons, $store, $domain, $theme, $request) {
-                $favicon = $favicons->refresh($domain, $theme);
+                $favicon = $favicons->refresh($domain, $theme, $request->size());
 
                 return $store->response(
                     $favicon,
                     $request->size(),
                     $request->headers->get('If-None-Match'),
+                    format: $request->imageFormat(),
                 );
             },
             (int) config('favicons.refresh_decay_seconds'),

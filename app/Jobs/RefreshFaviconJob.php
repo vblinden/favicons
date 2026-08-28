@@ -26,6 +26,7 @@ class RefreshFaviconJob implements ShouldBeUnique, ShouldQueue
     public function __construct(
         public string $domain,
         public FaviconTheme $theme = FaviconTheme::Default,
+        public ?int $targetSize = null,
     ) {}
 
     public function uniqueId(): string
@@ -35,7 +36,7 @@ class RefreshFaviconJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(FaviconService $favicons): void
     {
-        $favicons->refresh($this->domain, $this->theme);
+        $favicons->refresh($this->domain, $this->theme, $this->targetSize);
     }
 
     public function failed(?Throwable $exception): void

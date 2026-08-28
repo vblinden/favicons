@@ -35,3 +35,22 @@ test('it keeps svg icon candidates with a high score', function () {
         ->and($icons[0]['score'])->toBeGreaterThan($icons[1]['score'])
         ->and($icons[1]['url'])->toBe('https://example.com/apple.png');
 });
+
+test('it boosts icons that meet the requested size', function () {
+    $guard = Mockery::mock(UrlGuard::class);
+    $guard->shouldReceive('isAllowedUrl')->andReturn(true);
+
+    $parser = new HtmlIconParser($guard);
+
+    $icons = $parser->parse(
+        '<link rel="icon" href="/small.png" sizes="16x16">'
+        .'<link rel="icon" href="/large.png" sizes="128x128">',
+        'https://example.com/',
+        64,
+    );
+
+    $byUrl = collect($icons)->keyBy('url');
+
+    expect($byUrl['https://example.com/large.png']['score'])
+        ->toBeGreaterThan($byUrl['https://example.com/small.png']['score']);
+});

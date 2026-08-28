@@ -70,13 +70,34 @@ return [
     | HTTP Caching
     |--------------------------------------------------------------------------
     |
-    | Responses always revalidate (max-age=0, must-revalidate) so DELETE
-    | refresh is visible on the next request. stale_while_revalidate allows
-    | soft-serving while a revalidation is in flight.
+    | Cached image responses may be stored by browsers and CDNs for max_age
+    | seconds. stale_while_revalidate allows soft-serving while a revalidation
+    | is in flight. Force-refresh remains available via DELETE /r/{domain}.
     |
     */
 
+    'http_max_age' => (int) env('FAVICONS_HTTP_MAX_AGE', 86400),
+
     'stale_while_revalidate' => (int) env('FAVICONS_STALE_WHILE_REVALIDATE', 86400),
+
+    /*
+    | When true and the queue is not sync, cold cache misses soft-serve a
+    | letter tile immediately and resolve the real icon in a background job.
+    */
+
+    'async_cold_miss' => (bool) env('FAVICONS_ASYNC_COLD_MISS', true),
+
+    /*
+    | How many top-scoring icon candidates to download concurrently.
+    */
+
+    'parallel_candidates' => (int) env('FAVICONS_PARALLEL_CANDIDATES', 4),
+
+    /*
+    | Maximum domains accepted by the batch endpoint.
+    */
+
+    'batch_max_domains' => (int) env('FAVICONS_BATCH_MAX_DOMAINS', 50),
 
     /*
     | Bump this when served image bytes change without fetched_at changing
@@ -163,5 +184,11 @@ return [
     */
 
     'leaderboard_limit' => (int) env('FAVICONS_LEADERBOARD_LIMIT', 50),
+
+    /*
+    | How many top leaderboard domains to warm on the scheduled command.
+    */
+
+    'warm_limit' => (int) env('FAVICONS_WARM_LIMIT', 50),
 
 ];

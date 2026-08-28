@@ -48,9 +48,11 @@ function fakeExampleSite(?string $html = null, ?string $iconBody = null): void
         'https://example.com/' => Http::response($html, 200, ['Content-Type' => 'text/html']),
         'https://example.com/icon.png' => Http::response($iconBody, 200, ['Content-Type' => 'image/png']),
         'https://example.com/favicon.ico' => Http::response($iconBody, 200, ['Content-Type' => 'image/png']),
+        'https://example.com/*' => Http::response('missing', 404),
         'https://www.example.com/' => Http::response($html, 200, ['Content-Type' => 'text/html']),
         'https://www.example.com/icon.png' => Http::response($iconBody, 200, ['Content-Type' => 'image/png']),
         'https://www.example.com/favicon.ico' => Http::response($iconBody, 200, ['Content-Type' => 'image/png']),
+        'https://www.example.com/*' => Http::response('missing', 404),
         'https://staravatars.com/*' => Http::response('missing', 404),
     ]);
 }
@@ -108,6 +110,7 @@ test('it falls back to favicon.ico when html has no icons', function () {
     Http::fake([
         'https://example.com/' => Http::response('<html><head><title>x</title></head></html>', 200, ['Content-Type' => 'text/html']),
         'https://example.com/favicon.ico' => Http::response($png, 200, ['Content-Type' => 'image/png']),
+        'https://example.com/*' => Http::response('missing', 404),
         'https://staravatars.com/*' => Http::response('missing', 404),
     ]);
 
@@ -201,6 +204,7 @@ test('it resizes ico masters without falling back to a letter tile', function ()
     Http::fake([
         'https://example.com/' => Http::response('<html></html>', 200, ['Content-Type' => 'text/html']),
         'https://example.com/favicon.ico' => Http::response($ico, 200, ['Content-Type' => 'image/x-icon']),
+        'https://example.com/*' => Http::response('missing', 404),
         'https://staravatars.com/*' => Http::response('missing', 404),
     ]);
 
@@ -232,6 +236,7 @@ test('it uses a 32-bit ico frame when an earlier paletted frame of the same size
     Http::fake([
         'https://example.com/' => Http::response('<html></html>', 200, ['Content-Type' => 'text/html']),
         'https://example.com/favicon.ico' => Http::response($ico, 200, ['Content-Type' => 'image/vnd.microsoft.icon']),
+        'https://example.com/*' => Http::response('missing', 404),
         'https://staravatars.com/*' => Http::response('missing', 404),
     ]);
 
@@ -266,6 +271,7 @@ test('it refetches a cached svg master instead of serving a letter tile', functi
         ),
         'https://example.com/icon.png' => Http::response(samplePng(32, 10, 10, 10), 200, ['Content-Type' => 'image/png']),
         'https://example.com/favicon.ico' => Http::response('missing', 404),
+        'https://example.com/*' => Http::response('missing', 404),
         'https://staravatars.com/*' => Http::response('missing', 404),
     ]);
 
@@ -297,6 +303,7 @@ test('it refreshes a favicon and rate limits after five attempts per week', func
             ),
             'https://example.com/icon-'.$i.'.png' => Http::response(samplePng(48, $i * 20, 100, 150), 200, ['Content-Type' => 'image/png']),
             'https://example.com/favicon.ico' => Http::response(samplePng(16), 200, ['Content-Type' => 'image/png']),
+            'https://example.com/*' => Http::response('missing', 404),
             'https://staravatars.com/*' => Http::response('missing', 404),
         ]);
 
@@ -322,11 +329,12 @@ test('favicon responses revalidate and change etag after refresh', function () {
         ->and($masterEtag)->not->toBe($sizedEtag);
 
     expect($master->headers->get('Cache-Control'))
-        ->toContain('max-age=0')
-        ->toContain('must-revalidate');
+        ->toContain('max-age=86400')
+        ->toContain('stale-while-revalidate');
     expect($sized->headers->get('Cache-Control'))
-        ->toContain('max-age=0')
-        ->toContain('must-revalidate');
+        ->toContain('max-age=86400')
+        ->toContain('stale-while-revalidate');
+    expect($master->headers->get('X-Favicon-Status'))->toBe('ok');
     expect($master->headers->get('Last-Modified'))->not->toBeEmpty();
     expect($sized->headers->get('Last-Modified'))->not->toBeEmpty();
 
@@ -343,6 +351,7 @@ test('favicon responses revalidate and change etag after refresh', function () {
         ),
         'https://example.com/icon-new.png' => Http::response(samplePng(96, 200, 40, 40), 200, ['Content-Type' => 'image/png']),
         'https://example.com/favicon.ico' => Http::response(samplePng(16), 200, ['Content-Type' => 'image/png']),
+        'https://example.com/*' => Http::response('missing', 404),
         'https://staravatars.com/*' => Http::response('missing', 404),
     ]);
 

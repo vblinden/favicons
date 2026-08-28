@@ -11,9 +11,9 @@ class HtmlIconParser
     ) {}
 
     /**
-     * @return list<array{url: string, score: int, theme: string}>
+     * @return list<array{url: string, score: int, theme: string, size: int|null}>
      */
-    public function parse(string $html, string $baseUrl): array
+    public function parse(string $html, string $baseUrl, ?int $targetSize = null): array
     {
         $icons = [];
 
@@ -42,7 +42,8 @@ class HtmlIconParser
             }
 
             $sizes = $this->attribute($tag, 'sizes');
-            $score = $this->scoreIcon($relTokens, $sizes);
+            $parsedSize = $this->parseMaxSize($sizes);
+            $score = $this->scoreIcon($relTokens, $parsedSize, $targetSize);
 
             // Prefer SVG icons when declared — browsers do the same. Raster
             // fallbacks (apple-touch / ico) remain as lower-scored candidates.
@@ -54,6 +55,7 @@ class HtmlIconParser
                 'url' => $absolute,
                 'score' => $score,
                 'theme' => $this->colorSchemeFromMedia($this->attribute($tag, 'media')),
+                'size' => $parsedSize,
             ];
         }
 
@@ -108,7 +110,7 @@ class HtmlIconParser
     /**
      * @param  list<string>  $relTokens
      */
-    private function scoreIcon(array $relTokens, ?string $sizes): int
+    private function scoreIcon(array $relTokens, ?int $iconSize, ?int $targetSize): int
     {
         $score = 50;
 
@@ -116,10 +118,17 @@ class HtmlIconParser
             $score += 40;
         }
 
-        $maxSize = $this->parseMaxSize($sizes);
+        if ($iconSize !== null) {
+            $score += min(200, $iconSize);
 
-        if ($maxSize !== null) {
-            $score += min(200, $maxSize);
+            if ($targetSize !== null) {
+                if ($iconSize >= $targetSize) {
+                    $score += 80;
+                    $score -= (int) min(40, ($iconSize - $targetSize) / 8);
+                } else {
+                    $score -= (int) min(120, ($targetSize - $iconSize));
+                }
+            }
         }
 
         return $score;

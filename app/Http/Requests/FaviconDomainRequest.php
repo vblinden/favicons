@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\FaviconFormat;
 use App\Enums\FaviconTheme;
 use App\Services\Favicons\DomainNormalizer;
 use Illuminate\Contracts\Validation\Validator;
@@ -24,6 +25,7 @@ class FaviconDomainRequest extends FormRequest
         return [
             'sz' => ['sometimes', 'nullable', 'integer', 'min:'.config('favicons.min_size'), 'max:'.config('favicons.max_size')],
             'theme' => ['sometimes', 'nullable', 'string', Rule::in(['dark', 'light'])],
+            'format' => ['sometimes', 'nullable', 'string', Rule::in(FaviconFormat::values())],
         ];
     }
 
@@ -59,6 +61,17 @@ class FaviconDomainRequest extends FormRequest
             : FaviconTheme::from($theme);
     }
 
+    public function imageFormat(): FaviconFormat
+    {
+        $format = $this->validated('format');
+
+        if (is_string($format) && $format !== '') {
+            return FaviconFormat::from($format);
+        }
+
+        return $this->formatFromAccept() ?? FaviconFormat::Png;
+    }
+
     protected function prepareForValidation(): void
     {
         if ($this->query->has('sz') && $this->query('sz') === '') {
@@ -68,6 +81,10 @@ class FaviconDomainRequest extends FormRequest
         if ($this->query->has('theme') && $this->query('theme') === '') {
             $this->merge(['theme' => null]);
         }
+
+        if ($this->query->has('format') && $this->query('format') === '') {
+            $this->merge(['format' => null]);
+        }
     }
 
     protected function failedValidation(Validator $validator): void
@@ -75,6 +92,21 @@ class FaviconDomainRequest extends FormRequest
         throw new HttpResponseException(
             response($validator->errors()->first() ?: 'Invalid request', 422),
         );
+    }
+
+    private function formatFromAccept(): ?FaviconFormat
+    {
+        $accept = strtolower((string) $this->header('Accept', ''));
+
+        if ($accept === '' || str_contains($accept, '*/*')) {
+            return null;
+        }
+
+        if (str_contains($accept, 'image/webp') && ! str_contains($accept, 'image/png')) {
+            return FaviconFormat::Webp;
+        }
+
+        return null;
     }
 
     private function normalizer(): DomainNormalizer

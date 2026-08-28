@@ -16,7 +16,7 @@ class FaviconService
         private FaviconStore $store,
     ) {}
 
-    public function getOrFetch(string $domain, string $clientIp, FaviconTheme $theme = FaviconTheme::Default): Favicon
+    public function getOrFetch(string $domain, string $clientIp, FaviconTheme $theme = FaviconTheme::Default, ?int $targetSize = null): Favicon
     {
         $existing = $this->store->find($domain, $theme);
 
@@ -25,29 +25,36 @@ class FaviconService
         }
 
         if ($this->store->canRasterize($existing)) {
-            RefreshFaviconJob::dispatch($domain, $theme);
+            RefreshFaviconJob::dispatch($domain, $theme, $targetSize);
 
             return $existing;
         }
 
         $this->assertCanFetch($clientIp);
 
-        return $this->fetchAndPersist($domain, $theme, force: false);
+        if ($existing === null && $this->usesAsyncColdMiss()) {
+            $placeholder = $this->store->persistPlaceholder($domain, $theme);
+            RefreshFaviconJob::dispatch($domain, $theme, $targetSize);
+
+            return $placeholder;
+        }
+
+        return $this->fetchAndPersist($domain, $theme, force: false, targetSize: $targetSize);
     }
 
-    public function refresh(string $domain, FaviconTheme $theme = FaviconTheme::Default): Favicon
+    public function refresh(string $domain, FaviconTheme $theme = FaviconTheme::Default, ?int $targetSize = null): Favicon
     {
-        return $this->fetchAndPersist($domain, $theme, force: true);
+        return $this->fetchAndPersist($domain, $theme, force: true, targetSize: $targetSize);
     }
 
-    private function fetchAndPersist(string $domain, FaviconTheme $theme, bool $force): Favicon
+    private function fetchAndPersist(string $domain, FaviconTheme $theme, bool $force, ?int $targetSize = null): Favicon
     {
         $lock = Cache::lock(
             'favicon:fetch:'.$domain.':'.$theme->value,
             (int) config('favicons.fetch_lock_seconds'),
         );
 
-        return $lock->block((int) config('favicons.fetch_lock_seconds'), function () use ($domain, $theme, $force) {
+        return $lock->block((int) config('favicons.fetch_lock_seconds'), function () use ($domain, $theme, $force, $targetSize) {
             if (! $force) {
                 $existing = $this->store->find($domain, $theme);
 
@@ -56,10 +63,16 @@ class FaviconService
                 }
             }
 
-            $resolved = $this->resolver->resolve($domain, $theme);
+            $resolved = $this->resolver->resolve($domain, $theme, $targetSize);
 
             return $this->store->persist($domain, $resolved, $theme);
         });
+    }
+
+    private function usesAsyncColdMiss(): bool
+    {
+        return (bool) config('favicons.async_cold_miss')
+            && config('queue.default') !== 'sync';
     }
 
     private function isFresh(?Favicon $favicon): bool

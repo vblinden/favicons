@@ -17,7 +17,12 @@ class FaviconShowController extends Controller
         FaviconStore $store,
     ): Response {
         try {
-            $favicon = $favicons->getOrFetch($request->domain(), (string) $request->ip(), $request->theme());
+            $favicon = $favicons->getOrFetch(
+                $request->domain(),
+                (string) $request->ip(),
+                $request->theme(),
+                $request->size(),
+            );
         } catch (FetchRateLimitedException $exception) {
             return response('Too Many Requests', HttpResponse::HTTP_TOO_MANY_REQUESTS, [
                 'Retry-After' => (string) $exception->retryAfter,
@@ -29,6 +34,7 @@ class FaviconShowController extends Controller
             $request->size(),
             $request->headers->get('If-None-Match'),
             recordRequest: true,
+            format: $request->imageFormat(),
         );
     }
 }
