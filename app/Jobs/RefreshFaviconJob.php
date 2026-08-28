@@ -23,11 +23,19 @@ class RefreshFaviconJob implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 60;
 
+    /**
+     * Declared with a default so jobs queued before this property existed
+     * can still be unserialized without accessing an uninitialized typed property.
+     */
+    public ?int $targetSize = null;
+
     public function __construct(
         public string $domain,
         public FaviconTheme $theme = FaviconTheme::Default,
-        public ?int $targetSize = null,
-    ) {}
+        ?int $targetSize = null,
+    ) {
+        $this->targetSize = $targetSize;
+    }
 
     public function uniqueId(): string
     {
