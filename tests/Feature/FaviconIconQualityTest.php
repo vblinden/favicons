@@ -186,3 +186,38 @@ test('it retries fallback masters after the fallback ttl', function () {
     expect($favicon->status)->toBe('ok')
         ->and($favicon->source_url)->toBe('https://example.com/icon.png');
 });
+
+test('it retries staravatars after a letter fallback expires', function () {
+    config(['favicons.letter_fallback_ttl_seconds' => 300]);
+
+    $path = hash('sha256', 'example.com|default').'.png';
+    $letter = qualitySamplePng(64, 200, 80, 80);
+    $star = qualitySamplePng(64, 30, 80, 200);
+
+    Storage::disk('favicons')->put($path, $letter);
+
+    Favicon::factory()->create([
+        'domain' => 'example.com',
+        'source_url' => null,
+        'storage_path' => $path,
+        'content_type' => 'image/png',
+        'width' => 64,
+        'height' => 64,
+        'status' => 'fallback',
+        'fetched_at' => now()->subMinutes(6),
+        'request_count' => 1,
+    ]);
+
+    Http::fake([
+        'https://example.com/*' => Http::response('nope', 404),
+        'http://example.com/*' => Http::response('nope', 404),
+        'https://staravatars.com/*' => Http::response($star, 200, ['Content-Type' => 'image/png']),
+    ]);
+
+    $this->get('/i/example.com')->assertSuccessful();
+
+    $favicon = Favicon::query()->where('domain', 'example.com')->first();
+
+    expect($favicon->source_url)->toContain('staravatars.com')
+        ->and($favicon->status)->toBe('fallback');
+});

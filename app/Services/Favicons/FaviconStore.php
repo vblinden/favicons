@@ -243,6 +243,6 @@ class FaviconStore
 
     private function shouldGenerateLetterFallback(Favicon $favicon): bool
     {
-        return $favicon->isFallback() && $favicon->source_url === null;
+        return $favicon->isLetterFallback();
     }
 }

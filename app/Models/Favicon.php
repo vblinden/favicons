@@ -58,6 +58,18 @@ class Favicon extends Model
         return $this->status === 'fallback';
     }
 
+    public function isLetterFallback(): bool
+    {
+        return $this->isFallback() && $this->source_url === null;
+    }
+
+    public function isStarAvatarFallback(): bool
+    {
+        return $this->isFallback()
+            && is_string($this->source_url)
+            && str_contains($this->source_url, 'staravatars.com');
+    }
+
     public function recordRequest(): void
     {
         static::query()->whereKey($this->getKey())->increment('request_count');

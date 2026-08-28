@@ -147,11 +147,7 @@ class FaviconResolver
         }
 
         $url = $this->starAvatarUrl($domain);
-        $downloaded = $this->download(
-            $url,
-            (int) config('favicons.max_icon_bytes'),
-            requireAllowedHost: false,
-        );
+        $downloaded = $this->downloadStarAvatar($url);
 
         if ($downloaded === null) {
             return null;
@@ -229,6 +225,93 @@ class FaviconResolver
         }
 
         return null;
+    }
+
+    /**
+     * @return array{contents: string, content_type: string}|null
+     */
+    private function downloadStarAvatar(string $url): ?array
+    {
+        $maxBytes = (int) config('favicons.max_icon_bytes');
+
+        try {
+            $response = $this->starAvatarClient($url, $maxBytes)->get($url);
+
+            if ($response->failed()) {
+                return null;
+            }
+
+            $contents = $response->body();
+
+            if ($contents === '' || strlen($contents) > $maxBytes) {
+                return null;
+            }
+
+            $contentType = strtolower((string) ($response->header('Content-Type') ?: ''));
+            $contentType = trim(explode(';', $contentType)[0]);
+
+            if ($contentType === '' || str_contains($contentType, 'text/html')) {
+                $contentType = $this->imageNormalizer->guessContentType($url, $contents);
+            }
+
+            if ($this->imageNormalizer->looksLikeSvg($contents, $contentType)) {
+                $contentType = 'image/svg+xml';
+            } elseif (! str_starts_with($contentType, 'image/')) {
+                if (! $this->imageNormalizer->looksLikeImage($contents)) {
+                    return null;
+                }
+
+                $contentType = $this->imageNormalizer->guessContentType($url, $contents);
+            }
+
+            return [
+                'contents' => $contents,
+                'content_type' => $contentType,
+            ];
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    private function starAvatarClient(string $url, int $maxBytes): PendingRequest
+    {
+        $options = [
+            'allow_redirects' => [
+                'max' => (int) config('favicons.max_redirects'),
+                'track_redirects' => true,
+            ],
+            'on_headers' => function (ResponseInterface $response) use ($maxBytes): void {
+                $length = $response->getHeaderLine('Content-Length');
+
+                if ($length !== '' && (int) $length > $maxBytes) {
+                    throw new RuntimeException('Response too large.');
+                }
+            },
+            'progress' => function (mixed $downloadTotal, mixed $downloadedBytes) use ($maxBytes): void {
+                if ((int) $downloadedBytes > $maxBytes) {
+                    throw new RuntimeException('Response too large.');
+                }
+            },
+        ];
+
+        return Http::withHeaders([
+            'User-Agent' => (string) config('favicons.user_agent'),
+            'Accept' => 'image/avif,image/webp,image/apng,image/png,image/*,*/*;q=0.8',
+        ])
+            ->timeout((int) config('favicons.timeout'))
+            ->connectTimeout((int) config('favicons.connect_timeout'))
+            ->retry(3, 250, function (Throwable $exception, PendingRequest $request, ?ResponseInterface $response) {
+                if ($exception instanceof ConnectionException) {
+                    return true;
+                }
+
+                if ($response === null) {
+                    return false;
+                }
+
+                return in_array($response->getStatusCode(), [429, 502, 503, 504], true);
+            })
+            ->withOptions($options);
     }
 
     /**

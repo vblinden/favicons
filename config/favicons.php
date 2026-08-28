@@ -104,6 +104,13 @@ return [
     'fallback_ttl_seconds' => (int) env('FAVICONS_FALLBACK_TTL_SECONDS', 86400),
 
     /*
+    | Letter tiles are generated locally when Star Avatars is unreachable.
+    | Retry sooner so a transient outage does not stick for a full day.
+    */
+
+    'letter_fallback_ttl_seconds' => (int) env('FAVICONS_LETTER_FALLBACK_TTL_SECONDS', 300),
+
+    /*
     | SHA-1 digests of icon bodies we refuse to serve (raw or PNG-normalized).
     | The Laravel skeleton favicon.ico is common on apps that only ship an SVG
     | logo; keeping it makes unrelated sites look like Laravel.

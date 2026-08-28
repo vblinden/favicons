@@ -68,9 +68,11 @@ class FaviconService
             return false;
         }
 
-        $ttl = $favicon->isFallback()
-            ? (int) config('favicons.fallback_ttl_seconds')
-            : (int) config('favicons.ttl_seconds');
+        $ttl = match (true) {
+            $favicon->isLetterFallback() => (int) config('favicons.letter_fallback_ttl_seconds'),
+            $favicon->isFallback() => (int) config('favicons.fallback_ttl_seconds'),
+            default => (int) config('favicons.ttl_seconds'),
+        };
 
         if ($ttl <= 0) {
             return true;
