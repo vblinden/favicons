@@ -160,11 +160,11 @@ test('it returns batch icon urls', function () {
         ->and($response->json('icons.1.status'))->toBe('unknown');
 });
 
-test('homepage includes the playground', function () {
+test('homepage documents the api endpoints', function () {
     $this->get('/')
         ->assertSuccessful()
-        ->assertSee('Try a domain', false)
-        ->assertSee('playground-domain', false)
+        ->assertDontSee('Try a domain', false)
+        ->assertDontSee('favicon-playground', false)
         ->assertSee('/s2/favicons', false)
         ->assertSee('/b?domains=', false);
 });
