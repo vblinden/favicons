@@ -72,7 +72,7 @@ class Favicon extends Model
 
     public function recordRequest(): void
     {
-        static::query()->whereKey($this->getKey())->increment('request_count');
+        static::query()->whereKey($this->getKey())->toBase()->increment('request_count');
     }
 
     /**

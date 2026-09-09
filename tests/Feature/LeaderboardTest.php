@@ -39,3 +39,22 @@ test('the leaderboard shows an empty state when nothing has been requested', fun
         ->assertSee('No requests yet', false)
         ->assertDontSee('unused.example', false);
 });
+
+test('the leaderboard cache ttl is configurable', function () {
+    config(['favicons.leaderboard_cache_seconds' => 1]);
+
+    Favicon::factory()->requested(10)->create(['domain' => 'gold.example']);
+
+    $this->get(route('leaderboard'))
+        ->assertSuccessful()
+        ->assertSee('gold.example', false)
+        ->assertDontSee('silver.example', false);
+
+    Favicon::factory()->requested(5)->create(['domain' => 'silver.example']);
+
+    sleep(2);
+
+    $this->get(route('leaderboard'))
+        ->assertSuccessful()
+        ->assertSee('silver.example', false);
+});

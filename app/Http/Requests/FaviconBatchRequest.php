@@ -67,9 +67,39 @@ class FaviconBatchRequest extends FormRequest
     {
         $format = $this->validated('format');
 
-        return is_string($format) && $format !== ''
-            ? FaviconFormat::from($format)
-            : FaviconFormat::Png;
+        if (is_string($format) && $format !== '') {
+            return FaviconFormat::from($format);
+        }
+
+        return $this->formatFromAccept() ?? FaviconFormat::Png;
+    }
+
+    /**
+     * Raw entries from the domains parameter that are not usable domains.
+     *
+     * @return list<string>
+     */
+    public function invalidDomains(): array
+    {
+        $parts = preg_split('/\s*,\s*/', (string) $this->input('domains', '')) ?: [];
+        $normalizer = $this->normalizer();
+        $invalid = [];
+
+        foreach ($parts as $part) {
+            $part = trim($part);
+
+            if ($part === '') {
+                continue;
+            }
+
+            $normalized = $normalizer->normalize($part);
+
+            if ($normalized === '' || ! $normalizer->isValid($normalized)) {
+                $invalid[$part] = $part;
+            }
+        }
+
+        return array_values($invalid);
     }
 
     /**
@@ -112,6 +142,21 @@ class FaviconBatchRequest extends FormRequest
                 'message' => $validator->errors()->first() ?: 'Invalid request',
             ], 422),
         );
+    }
+
+    private function formatFromAccept(): ?FaviconFormat
+    {
+        $accept = strtolower((string) $this->header('Accept', ''));
+
+        if ($accept === '' || str_contains($accept, '*/*')) {
+            return null;
+        }
+
+        if (str_contains($accept, 'image/webp') && ! str_contains($accept, 'image/png')) {
+            return FaviconFormat::Webp;
+        }
+
+        return null;
     }
 
     private function normalizer(): DomainNormalizer

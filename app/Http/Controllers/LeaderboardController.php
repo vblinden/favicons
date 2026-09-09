@@ -16,7 +16,7 @@ class LeaderboardController extends Controller
         /** @var Collection<int, object{rank: int, domain: string, request_count: int, preview: string}> $entries */
         $entries = collect(Cache::remember(
             'favicons:leaderboard:'.$limit,
-            60,
+            (int) config('favicons.leaderboard_cache_seconds', 60),
             function () use ($limit) {
                 return Favicon::query()
                     ->mostRequested()

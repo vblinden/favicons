@@ -3,6 +3,7 @@
 use App\Jobs\RefreshFaviconJob;
 use App\Models\Favicon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
@@ -167,4 +168,80 @@ test('homepage documents the api endpoints', function () {
         ->assertDontSee('favicon-playground', false)
         ->assertSee('/s2/favicons', false)
         ->assertSee('/b?domains=', false);
+});
+
+test('it queues resolves for unknown batch domains', function () {
+    config(['queue.default' => 'database']);
+    Queue::fake();
+
+    Favicon::factory()->create([
+        'domain' => 'example.com',
+        'status' => 'ok',
+        'source_url' => 'https://example.com/icon.png',
+        'fetched_at' => now(),
+    ]);
+
+    $this->getJson('/b?domains=example.com,newdomain.example')
+        ->assertSuccessful()
+        ->assertJsonPath('icons.1.status', 'unknown')
+        ->assertJsonPath('invalid', []);
+
+    Queue::assertPushed(RefreshFaviconJob::class, fn (RefreshFaviconJob $job) => $job->domain === 'newdomain.example');
+    Queue::assertNotPushed(RefreshFaviconJob::class, fn (RefreshFaviconJob $job) => $job->domain === 'example.com');
+});
+
+test('it reports invalid batch domains', function () {
+    $response = $this->getJson('/b?domains=example.com,not_a_domain,localhost&sz=32')
+        ->assertSuccessful();
+
+    expect($response->json('icons'))->toHaveCount(1)
+        ->and($response->json('icons.0.domain'))->toBe('example.com')
+        ->and($response->json('invalid'))->toContain('not_a_domain', 'localhost');
+});
+
+test('it negotiates webp for batch urls from the accept header', function () {
+    $response = $this->get('/b?domains=example.com', ['Accept' => 'image/webp'])
+        ->assertSuccessful();
+
+    expect($response->json('format'))->toBe('webp')
+        ->and($response->json('icons.0.url'))->toContain('format=webp');
+});
+
+test('image responses vary on accept', function () {
+    $png = improvementsPng(64);
+
+    Http::fake([
+        'https://example.com/' => Http::response(
+            '<html><head><link rel="icon" href="/icon.png"></head></html>',
+            200,
+            ['Content-Type' => 'text/html'],
+        ),
+        'https://example.com/icon.png' => Http::response($png, 200, ['Content-Type' => 'image/png']),
+        'https://example.com/favicon.ico' => Http::response('missing', 404),
+        'https://staravatars.com/*' => Http::response('missing', 404),
+    ]);
+
+    $this->get('/i/example.com')
+        ->assertSuccessful()
+        ->assertHeader('Vary', 'Accept');
+});
+
+test('a cold miss returns 429 when the fetch lock is held', function () {
+    config(['favicons.fetch_lock_wait_seconds' => 1]);
+
+    expect(Cache::lock('favicon:fetch:example.com:default', 10)->acquire())->toBeTrue();
+
+    $this->get('/i/example.com')
+        ->assertTooManyRequests()
+        ->assertHeader('Retry-After', '1');
+});
+
+test('a refresh returns 429 when the fetch lock is held', function () {
+    config(['favicons.fetch_lock_wait_seconds' => 1]);
+
+    expect(Cache::lock('favicon:fetch:example.com:default', 10)->acquire())->toBeTrue();
+
+    $this->delete('/r/example.com')
+        ->assertTooManyRequests()
+        ->assertHeader('Retry-After', '1');
 });

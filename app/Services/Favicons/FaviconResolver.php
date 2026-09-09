@@ -8,6 +8,7 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\UriInterface;
@@ -262,7 +263,12 @@ class FaviconResolver
             }
 
             return $this->parseImageResponse($response, $url, $maxBytes);
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            Log::debug('Favicon candidate download failed.', [
+                'url' => $url,
+                'error' => $exception->getMessage(),
+            ]);
+
             return null;
         }
     }
@@ -336,6 +342,11 @@ class FaviconResolver
                 $response = $this->client($url, (int) config('favicons.max_html_bytes'))->get($url);
 
                 if ($response->failed()) {
+                    Log::debug('Favicon html fetch failed.', [
+                        'url' => $url,
+                        'status' => $response->status(),
+                    ]);
+
                     continue;
                 }
 
@@ -349,7 +360,12 @@ class FaviconResolver
                     'body' => $response->body(),
                     'final_url' => (string) $response->effectiveUri(),
                 ];
-            } catch (Throwable) {
+            } catch (Throwable $exception) {
+                Log::debug('Favicon html fetch failed.', [
+                    'url' => $url,
+                    'error' => $exception->getMessage(),
+                ]);
+
                 continue;
             }
         }
@@ -377,7 +393,12 @@ class FaviconResolver
             }
 
             return $contents;
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            Log::debug('Favicon manifest download failed.', [
+                'url' => $url,
+                'error' => $exception->getMessage(),
+            ]);
+
             return null;
         }
     }
@@ -397,7 +418,12 @@ class FaviconResolver
             }
 
             return $this->parseImageResponse($response, $url, $maxBytes);
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            Log::debug('Star Avatars fallback download failed.', [
+                'url' => $url,
+                'error' => $exception->getMessage(),
+            ]);
+
             return null;
         }
     }

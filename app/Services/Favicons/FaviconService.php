@@ -6,6 +6,7 @@ use App\Enums\FaviconTheme;
 use App\Exceptions\FetchRateLimitedException;
 use App\Jobs\RefreshFaviconJob;
 use App\Models\Favicon;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -49,24 +50,30 @@ class FaviconService
 
     private function fetchAndPersist(string $domain, FaviconTheme $theme, bool $force, ?int $targetSize = null): Favicon
     {
+        $wait = max(1, (int) config('favicons.fetch_lock_wait_seconds', 5));
+
         $lock = Cache::lock(
             'favicon:fetch:'.$domain.':'.$theme->value,
             (int) config('favicons.fetch_lock_seconds'),
         );
 
-        return $lock->block((int) config('favicons.fetch_lock_seconds'), function () use ($domain, $theme, $force, $targetSize) {
-            if (! $force) {
-                $existing = $this->store->find($domain, $theme);
+        try {
+            return $lock->block($wait, function () use ($domain, $theme, $force, $targetSize) {
+                if (! $force) {
+                    $existing = $this->store->find($domain, $theme);
 
-                if ($this->isFresh($existing)) {
-                    return $existing;
+                    if ($this->isFresh($existing)) {
+                        return $existing;
+                    }
                 }
-            }
 
-            $resolved = $this->resolver->resolve($domain, $theme, $targetSize);
+                $resolved = $this->resolver->resolve($domain, $theme, $targetSize);
 
-            return $this->store->persist($domain, $resolved, $theme);
-        });
+                return $this->store->persist($domain, $resolved, $theme);
+            });
+        } catch (LockTimeoutException) {
+            throw new FetchRateLimitedException($wait);
+        }
     }
 
     private function usesAsyncColdMiss(): bool

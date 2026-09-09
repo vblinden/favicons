@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\FaviconTheme;
 use App\Http\Requests\FaviconBatchRequest;
+use App\Jobs\RefreshFaviconJob;
 use App\Models\Favicon;
 use Illuminate\Http\JsonResponse;
 
@@ -20,6 +22,8 @@ class FaviconBatchController extends Controller
             ->where('theme', $theme->value)
             ->get()
             ->keyBy('domain');
+
+        $this->warmMissing($domains, $existing->keys()->all(), $theme, $size);
 
         $icons = [];
 
@@ -48,6 +52,32 @@ class FaviconBatchController extends Controller
             'theme' => $theme->value,
             'format' => $format->value,
             'icons' => $icons,
+            'invalid' => $request->invalidDomains(),
         ]);
+    }
+
+    /**
+     * Queue a resolve for valid-but-unknown domains so the image URLs handed
+     * out above are warm by the time clients request them. Skipped on the
+     * sync queue driver, where dispatching would crawl inline inside this
+     * request. RefreshFaviconJob is unique per domain, so repeat batch calls
+     * do not pile up duplicate jobs.
+     *
+     * @param  list<string>  $domains
+     * @param  list<string>  $known
+     */
+    private function warmMissing(array $domains, array $known, FaviconTheme $theme, int $size): void
+    {
+        if (config('queue.default') === 'sync') {
+            return;
+        }
+
+        $known = array_flip($known);
+
+        foreach ($domains as $domain) {
+            if (! isset($known[$domain])) {
+                RefreshFaviconJob::dispatch($domain, $theme, $size);
+            }
+        }
     }
 }

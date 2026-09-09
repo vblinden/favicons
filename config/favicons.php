@@ -178,12 +178,22 @@ return [
     'fetch_lock_seconds' => (int) env('FAVICONS_FETCH_LOCK_SECONDS', 30),
 
     /*
+    | How long a request waits to acquire the per-domain fetch lock before
+    | giving up with a 429. Kept short so cold-miss stampedes fail fast
+    | instead of piling up PHP workers behind a single slow crawl.
+    */
+
+    'fetch_lock_wait_seconds' => (int) env('FAVICONS_FETCH_LOCK_WAIT_SECONDS', 5),
+
+    /*
     |--------------------------------------------------------------------------
     | Leaderboard
     |--------------------------------------------------------------------------
     */
 
     'leaderboard_limit' => (int) env('FAVICONS_LEADERBOARD_LIMIT', 50),
+
+    'leaderboard_cache_seconds' => (int) env('FAVICONS_LEADERBOARD_CACHE_SECONDS', 60),
 
     /*
     | How many top leaderboard domains to warm on the scheduled command.

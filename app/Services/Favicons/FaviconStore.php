@@ -269,6 +269,7 @@ class FaviconStore
         $headers = [
             'Cache-Control' => "public, max-age={$maxAge}, stale-while-revalidate={$stale}",
             'ETag' => $etag,
+            'Vary' => 'Accept',
             'Content-Type' => $format->contentType(),
             'X-Content-Type-Options' => 'nosniff',
             'X-Favicon-Status' => $this->statusHeader($favicon),
